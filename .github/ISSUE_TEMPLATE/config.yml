@@ -1,7 +1,9 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
 contact_links:
   - name: Security policy
     url: https://github.com/navi-crwn/hop-auth/security/policy
     about: |
       Report security vulnerabilities privately.
       Do not open a public issue for security problems.
+      Note: these issue forms remain public. Setting blank issues to "false" is a
+      conservative UX nudge, not a guarantee that public disclosure is prevented.
