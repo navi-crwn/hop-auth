@@ -1,0 +1,78 @@
+name: static checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  static-checks:
+    name: static checks (php 8.3)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: setup php
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: assert php 8.3
+        run: |
+          php -v
+          php -r 'if (!(version_compare(PHP_VERSION, "8.3.0", ">=") && version_compare(PHP_VERSION, "8.4.0", "<"))) { fwrite(STDERR, "unexpected PHP version: " . PHP_VERSION . PHP_EOL); exit(1); }'
+
+      - name: composer validate
+        run: composer --no-plugins --no-scripts validate --strict
+
+      - name: lint php files
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d "${RUNNER_TEMP:-/tmp}/hop-lint.XXXXXX")"
+          trap 'rm -rf "$tmp"' EXIT
+          # enumerate ALL tracked ordinary php files, NUL-safe; explicit failure if git errors
+          if ! git ls-files -z -- '*.php' ':(exclude)vendor/*' ':(exclude)node_modules/*' > "$tmp/all.bin"; then
+            echo "git ls-files failed" >&2
+            exit 1
+          fi
+          # filter: keep *.php, explicitly exclude *.blade.php (php -l does not compile Blade)
+          count=0
+          while IFS= read -r -d '' f; do
+            case "$f" in
+              *.blade.php)
+                echo "excluding blade template (not php -l compileable): ${f}" >&2
+                ;;
+              *.php)
+                printf '%s\0' "$f" >> "$tmp/kept.bin"
+                count=$((count + 1))
+                ;;
+            esac
+          done < "$tmp/all.bin"
+          if [ "${count}" -eq 0 ]; then
+            echo "no tracked php files found; refusing to pass" >&2
+            exit 1
+          fi
+          echo "linting ${count} tracked php file(s)"
+          failures=0
+          while IFS= read -r -d '' f; do
+            if [ ! -f "${f}" ]; then
+              echo "tracked file missing from checkout: ${f}" >&2
+              failures=$((failures + 1))
+              continue
+            fi
+            if ! php -l "${f}"; then
+              failures=$((failures + 1))
+            fi
+          done < "$tmp/kept.bin"
+          if [ "${failures}" -ne 0 ]; then
+            echo "${failures} lint failure(s)" >&2
+            exit 1
+          fi
