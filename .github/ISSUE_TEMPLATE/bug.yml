@@ -82,7 +82,9 @@ body:
       label: Logs (sanitized)
       description: |
         Paste relevant log output or stack trace.
-        **Remove all secrets, tokens, passwords, and credentials before pasting.**
+        **Remove all secrets, tokens, passwords, credentials, and personally
+        identifiable information (PII) — such as real names, email addresses,
+        phone numbers, and IP addresses — before pasting.**
       render: shell
     validations:
       required: false
@@ -91,5 +93,5 @@ body:
     attributes:
       label: Logs hygiene
       options:
-        - label: I have removed all secrets, tokens, passwords, and credentials from the logs above.
+        - label: I have removed all secrets, tokens, passwords, credentials, and personally identifiable information (PII) from the logs above.
           required: true

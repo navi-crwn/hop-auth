@@ -41,14 +41,19 @@ meantime.
 - A minimal reproduction: code snippet, request, or sequence of steps.
 - Expected behavior vs. actual behavior.
 - Impact and any known mitigations.
-- Sanitized logs only — **never include secrets, API keys, tokens, or credentials.**
+- Sanitized logs only — **never include secrets, API keys, tokens, credentials, or
+  personally identifiable information (PII)** such as real names, email addresses,
+  phone numbers, or IP addresses. Redact or replace such data before submitting.
 
 ## Coordination
 
-- The maintainer will acknowledge receipt as soon as practical.
-- A coordinated disclosure timeline of **90 days** from acknowledgment is the default,
-  adjustable by mutual agreement.
-- Credit is given in the published advisory unless you request otherwise.
+- The maintainer will acknowledge receipt as soon as practical; this is a
+  best-effort expectation, not a guaranteed response time or SLA.
+- Reporters are asked to coordinate disclosure privately with the maintainer.
+  No fixed disclosure deadline is imposed unilaterally; timing is agreed between
+  the reporter and the maintainer.
+- Credit in any published advisory is at the discretion of the reporter and
+  maintainer; it is not guaranteed.
 
 ## Supported Versions
 
