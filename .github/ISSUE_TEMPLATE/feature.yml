@@ -1,0 +1,48 @@
+name: Feature request
+description: Suggest an enhancement or new capability for hop/auth.
+labels: ["feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature.
+
+        **Security notice:** Do **not** describe security-sensitive internals or
+        attack-surface changes in this public form. If your idea touches security,
+        report it privately via
+        [SECURITY.md](https://github.com/navi-crwn/hop-auth/security/policy).
+  - type: checkboxes
+    id: not-security
+    attributes:
+      label: Before you continue
+      options:
+        - label: This is not a security-sensitive change. I will report security topics privately via the SECURITY.md process.
+          required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: What problem does this solve? Who benefits, and how?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Proposed scope
+      description: What should the package do? Describe the desired behavior or API.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you considered and why they fall short.
+    validations:
+      required: false
+  - type: input
+    id: related-issue
+    attributes:
+      label: Related issue or PR (if any)
+      placeholder: "e.g. #12"
+    validations:
+      required: false
