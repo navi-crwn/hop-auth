@@ -1,0 +1,97 @@
+name: Bug report
+description: Report a defect in hop/auth that is not a security vulnerability.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+
+        **Security notice:** Do **not** use this form for security vulnerabilities.
+        Vulnerabilities must be reported privately — see
+        [SECURITY.md](https://github.com/navi-crwn/hop-auth/security/policy).
+  - type: checkboxes
+    id: not-security
+    attributes:
+      label: Before you continue
+      options:
+        - label: This is not a security vulnerability. I will report security issues privately via the SECURITY.md process.
+          required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal, self-contained steps. Include code if possible.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Package version
+      description: Run `composer show hop/auth` and paste the version.
+      placeholder: "e.g. dev-main or 0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: php
+    attributes:
+      label: PHP version
+      placeholder: "e.g. 8.3.6"
+    validations:
+      required: true
+  - type: input
+    id: laravel
+    attributes:
+      label: Laravel version
+      placeholder: "e.g. 12.x"
+    validations:
+      required: false
+  - type: input
+    id: browser
+    attributes:
+      label: Browser / client (if applicable)
+      placeholder: "e.g. Firefox 126, curl 8.8.0, or n/a"
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (sanitized)
+      description: |
+        Paste relevant log output or stack trace.
+        **Remove all secrets, tokens, passwords, credentials, and personally
+        identifiable information (PII) — such as real names, email addresses,
+        phone numbers, and IP addresses — before pasting.**
+      render: shell
+    validations:
+      required: false
+  - type: checkboxes
+    id: no-secrets
+    attributes:
+      label: Logs hygiene
+      options:
+        - label: I have removed all secrets, tokens, passwords, credentials, and personally identifiable information (PII) from the logs above.
+          required: true
