@@ -59,6 +59,20 @@ HOP_SSO_SECRET_PREV=previous_secret_key_during_rotation_window
 - `hop.token:{scope}`: Verifies bearer API tokens for specified scopes.
 - `hop.signed`: Verifies server-to-server signed requests (HMAC-SHA256).
 
+### API token rate limit
+
+`hop.token` allows each token `rate_limit` requests per hour (counted atomically in the default cache store). A token with no usable `rate_limit` (empty or not above zero) gets `hop-auth.api_rate_limit` (default 100). A refused request gets a `429` with `retry_after` (seconds until the window ends) and a matching `Retry-After` header.
+
+### Chained logout and trusted hosts
+
+`/auth/sso/logout?next=` only follows an `https` URL whose host is listed in `hop-auth.trusted_hosts`, plus the hub (`HOP_HUB_URL`), this app (`APP_URL`) and the app URLs in `config/hop.php`. There is no wildcard matching: `evil.hel.ink` is not trusted just because it is under `hel.ink`. Plain `http` is accepted for `localhost`, `127.0.0.1` and `[::1]` only. Anything else falls back to `/`.
+
+The default list is the production family: `hel.ink`, `www.hel.ink`, `hub.hel.ink`, `link.hel.ink`, `bio.hel.ink`, `note.hel.ink`, `pixel.hel.ink`. If you self-host the family on your own domain, set the hosts of your apps:
+
+```ini
+HOP_TRUSTED_HOSTS=example.org,hub.example.org,link.example.org,bio.example.org
+```
+
 ---
 
 ## HOP Family Ecosystem
