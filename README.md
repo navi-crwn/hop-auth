@@ -1,24 +1,27 @@
 # hop/auth
 
-Single Sign-On (SSO) client, ticket verification, and request signing package for the **HOP** family of applications behind [hel.ink](https://hel.ink).
+The Laravel client for HOP ID, the account service of the HOP family ([hel.ink](https://hel.ink)). It lets an app in the family sign people in through the hub at `hub.hel.ink`, check the sign-in ticket the hub sends back, accept scoped API tokens, and sign people out again.
 
-`hop/auth` enables any Laravel application in the ecosystem to authenticate members against the centralized HOP ID hub (`hub.hel.ink`), verify short-lived HMAC tickets, validate scoped API tokens, handle chained logouts, and verify inter-service server-to-server HMAC signatures.
+The hub itself uses only the `ApiToken` model and the middleware aliases. The SSO routes are for the apps that consume HOP ID, such as LinkHop and BioHop.
 
----
+## What it provides
 
-## Features
+- Three routes for the sign-in round trip: start, callback and logout.
+- `Hop\Auth\Ticket`, which verifies a ticket signed with HMAC-SHA256. It checks the signature, the audience (this app), the expiry and the `state` the app sent. A previous secret is accepted during a rotation.
+- The `hop.auth` middleware: like Laravel's `auth`, but a guest is sent through the hub instead of to a local login page.
+- The `hop.token` middleware: bearer API tokens from the shared `api_tokens` table, with scopes, expiry and an hourly rate limit per token.
+- A chained logout that only follows links to trusted hosts.
 
-- **SSO Ticket Verification**: Validates short-lived tickets issued by HOP ID (`/auth/sso/callback`).
-- **Dual-Secret Rotation**: Seamlessly transitions secrets (`HOP_SSO_SECRET` and `HOP_SSO_SECRET_PREV`) with zero user-facing downtime during secret rotations.
-- **Scoped API Tokens**: Middleware `hop.token:{scope}` verifying tokens against the shared `api_tokens` table.
-- **Chained Logout**: Cleanses local app session and forwards logout request to the hub logout endpoint.
-- **Signed Inter-Service Calls**: Middleware `hop.signed` verifying `X-HOP-Signature`, `X-HOP-Nonce`, and anti-replay timestamp bounds.
+## Requirements
 
----
+- PHP 8.3 and Laravel 12 (`illuminate/support` ^12.0).
+- The family's shared `users` table. The package signs in the user whose id is the ticket's `sub`.
+- For API tokens, the shared `api_tokens` table. The package does not ship a migration for it; tokens are made and revoked at the hub.
+- A session and a cache store. The cache holds the single-use marker of each ticket and the rate limit counters.
 
 ## Installation
 
-Within a HOP ecosystem app, add the repository reference in `composer.json`:
+The package is not on Packagist. Add the repository to the app's `composer.json`:
 
 ```json
 "repositories": [
@@ -38,44 +41,118 @@ Then run:
 composer update hop/auth
 ```
 
-The `Hop\Auth\AuthServiceProvider` will auto-register with Laravel package discovery.
-
----
+Laravel's package discovery registers `Hop\Auth\AuthServiceProvider`. The provider does not load the SSO routes when `config('hop.current')` is `hub`: the hub issues tickets and never consumes them.
 
 ## Configuration
 
-Add the following environment variables to your application's `.env`:
+Set these in the app's `.env`. Only `HOP_APP` and `HOP_SSO_SECRET` are usually needed:
 
 ```ini
 HOP_APP=linkhop
 HOP_HUB_URL=https://hub.hel.ink
-HOP_SSO_SECRET=current_secret_key_minimum_32_characters
-HOP_SSO_SECRET_PREV=previous_secret_key_during_rotation_window
+HOP_SSO_SECRET=at-least-32-characters-shared-with-the-hub
+# HOP_SSO_SECRET_PREV=only-while-rotating
+# HOP_USER_MODEL=App\Models\User
+# HOP_TRUSTED_HOSTS=only-for-a-self-hosted-family
 ```
 
-### Registered Middleware Aliases
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `HOP_APP` | `linkhop` | This app's slug in the hub's `config/hop.php`. It is also the ticket audience. |
+| `HOP_HUB_URL` | `https://hub.hel.ink` | The hub that issues tickets. |
+| `HOP_SSO_SECRET` | none | The shared HMAC secret. Secrets shorter than 32 characters are ignored, and with no usable secret every ticket is refused as `not_configured`. |
+| `HOP_SSO_SECRET_PREV` | none | The previous secret, accepted only while you rotate. |
+| `HOP_USER_MODEL` | `App\Models\User` | The model signed in, and the owner of an API token. |
+| `HOP_TRUSTED_HOSTS` | the production family hosts | Hosts the chained logout may redirect to. See below. |
 
-- `hop.auth`: Ensures the user is authenticated via HOP SSO; redirects unauthenticated visitors to `HOP_HUB_URL/auth/sso`.
-- `hop.token:{scope}`: Verifies bearer API tokens for specified scopes.
-- `hop.signed`: Verifies server-to-server signed requests (HMAC-SHA256).
+The remaining options have no environment variable. Publish the config file to change them:
+
+```bash
+php artisan vendor:publish --tag=hop-auth-config
+```
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `leeway` | `30` | Seconds of clock skew tolerated when checking a ticket's `exp` and `iat`. |
+| `home` | `/dashboard` | Where to land after sign-in when the app did not ask for a page. |
+| `api_rate_limit` | `100` | Requests per hour for an API token that has no limit of its own. |
+| `routes.start`, `routes.callback`, `routes.logout` | `/auth/sso`, `/auth/sso/callback`, `/auth/sso/logout` | The route paths. Set `routes.start` to `null` to skip the package routes and register your own. |
+
+## How a sign-in runs
+
+1. A guest opens a page behind `hop.auth`. The middleware sends them to `/auth/sso?next=<page>`. A JSON request gets a `401` instead.
+2. `start` stores a random `state` and the `next` page in the session, then redirects to `HOP_HUB_URL/sso/{HOP_APP}?state=…&return_to=<callback url>`. Only a same-site path is kept as `next`.
+3. The hub signs the person in and redirects to `/auth/sso/callback?ticket=…`.
+4. `callback` verifies the ticket and the state. It refuses a ticket that was already used (the `jti` is remembered for 5 minutes) and a suspended account (`status` of `suspended`).
+5. It signs in the user whose id is `sub`, regenerates the session, keeps the ticket payload in the session as `hop_profile`, and redirects to `next` or to `home`.
+
+A ticket is `base64url(json)` and `base64url(HMAC-SHA256)` joined by a dot. The JSON needs `sub`, `exp` and `state`. `aud`, `iat`, `jti` and `status` are optional. `Ticket::verify()` throws `Hop\Auth\TicketException` with one of these reasons: `not_configured`, `malformed`, `bad_signature`, `expired`, `wrong_audience`, `state_mismatch`.
+
+### Secret rotation
+
+Put the new secret in `HOP_SSO_SECRET` and the old one in `HOP_SSO_SECRET_PREV`. A ticket signed with either one is accepted. Remove the old value once the hub signs only with the new one.
+
+## Protecting routes
+
+```php
+Route::middleware('hop.auth')->group(function () {
+    Route::get('/dashboard', DashboardController::class);
+});
+
+Route::middleware('hop.token:link:create')->post('/api/links', StoreLinkController::class);
+```
+
+### API tokens
+
+A client sends `Authorization: Bearer hlk_…`. The package stores only the SHA-256 hash of a token. `hop.token` answers with JSON of the form `{"success": false, "error": "…", "message": "…"}` and these statuses:
+
+| Status | Cause |
+| --- | --- |
+| 401 | Missing or malformed header, unknown token, or expired token. |
+| 403 | The account is suspended, or the token lacks the required scope. |
+| 429 | The token's hourly limit is used up. |
+
+On success the request carries the `api_user` and `api_token` attributes, and `$request->user()` returns the token's owner.
+
+`hop.token` without a scope only checks that the token is valid. `hop.token:link:create` also needs the `link:create` scope. A token with no scopes (null or an empty list) may do everything. Otherwise `can()` accepts an exact match, a prefix wildcard such as `link:*`, or `*`. The scopes the family defines are in `ApiToken::SCOPES`: `link:read`, `link:create`, `link:write`, `bio:read`, `bio:write`, `pixel:read` and `pixel:write`.
 
 ### API token rate limit
 
-`hop.token` allows each token `rate_limit` requests per hour (counted atomically in the default cache store). A token with no usable `rate_limit` (empty or not above zero) gets `hop-auth.api_rate_limit` (default 100). A refused request gets a `429` with `retry_after` (seconds until the window ends) and a matching `Retry-After` header.
+Each token may make `rate_limit` requests per hour. A token whose `rate_limit` is empty or not above zero gets `hop-auth.api_rate_limit` (100 by default). The window starts at the token's first request and ends an hour later. The counter lives in the rate limiter's cache store and is incremented before it is compared with the limit, so parallel requests cannot all pass together.
 
-### Chained logout and trusted hosts
+A refused request gets a `429` with `retry_after` in the body and a matching `Retry-After` header, both in seconds until the window ends.
 
-`/auth/sso/logout?next=` only follows an `https` URL whose host is listed in `hop-auth.trusted_hosts`, plus the hub (`HOP_HUB_URL`), this app (`APP_URL`) and the app URLs in `config/hop.php`. There is no wildcard matching: `evil.hel.ink` is not trusted just because it is under `hel.ink`. Plain `http` is accepted for `localhost`, `127.0.0.1` and `[::1]` only. Anything else falls back to `/`.
+## Chained logout and trusted hosts
 
-The default list is the production family: `hel.ink`, `www.hel.ink`, `hub.hel.ink`, `link.hel.ink`, `bio.hel.ink`, `note.hel.ink`, `pixel.hel.ink`. If you self-host the family on your own domain, set the hosts of your apps:
+`/auth/sso/logout` signs the person out here, invalidates the session and regenerates the CSRF token. If `?next=` holds a trusted URL it then redirects there, which is how the hub signs a person out of every app. Anything else goes to `/`.
+
+A `next` URL is trusted when all of this holds:
+
+- Its host is exactly one of the trusted hosts. There is no wildcard matching: `evil.hel.ink` is not trusted because `hel.ink` is.
+- It has no user info, no whitespace or control characters, and no backslash.
+- It uses `https`. Plain `http` is accepted only for `localhost`, `127.0.0.1` and `[::1]`, and only when that host is in the trusted list.
+
+The trusted hosts are `hop-auth.trusted_hosts` plus the hub (`HOP_HUB_URL`), this app (`APP_URL`), and the URLs in the shared `config/hop.php` (`hop.public_url`, `hop.hub_url` and each app's `url`).
+
+The default list is the production family: `hel.ink`, `www.hel.ink`, `hub.hel.ink`, `link.hel.ink`, `bio.hel.ink`, `note.hel.ink` and `pixel.hel.ink`. `HOP_TRUSTED_HOSTS` replaces that list. If you run the family on your own domain, set the hosts of your apps:
 
 ```ini
 HOP_TRUSTED_HOSTS=example.org,hub.example.org,link.example.org,bio.example.org
 ```
 
----
+## Tests
 
-## HOP Family Ecosystem
+The tests in `tests/Feature` are Pest tests that need a Laravel app with the shared `users` table, so they run inside an app that uses the package (HEL.ink includes a copy in `packages/auth`). This repository's own CI checks that `composer.json` is valid, that every PHP file lints under PHP 8.3, and that the family table below matches the canonical one.
+
+## Security
+
+Report vulnerabilities as described in [SECURITY.md](SECURITY.md), not in public issues.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
+## HOP family
 
 <!-- hop-family:start -->
 <!-- Generated from HEL.ink resources/hop-assets/apps.source.json; edit there, then run scripts/hop_assets.py build. -->
@@ -88,8 +165,6 @@ HOP_TRUSTED_HOSTS=example.org,hub.example.org,link.example.org,bio.example.org
 | **NoteHop** | [note.hel.ink](https://note.hel.ink) · `n.hel.ink/…` | [navi-crwn/NoteHop](https://github.com/navi-crwn/NoteHop) | Encrypted notes you share with a link. |
 | **Imperium** | private (owner only) | private | The HOP control panel. |
 <!-- hop-family:end -->
-
----
 
 ## License
 
