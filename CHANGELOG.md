@@ -4,6 +4,10 @@ All notable changes to `hop/auth` are listed here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+### Added
+
+- Receiver for the hub's account events (`POST /hop/events`): the `hop.event` middleware (signature of the hub with the app's secret or previous secret, timestamp window, each nonce once, one bare 401 for every refusal), `EventController` (event id once only, 200 for a type the app does not know, 500 and a retry when a handler fails), the `HopEvents::on()` / `forget()` hooks, and `SessionRevoker`, which deletes the sessions of an account (database and file drivers) and rotates its `remember_token`. Built in: `session.revoked` and `account.deleted` end the sessions of that account. The route is off until `hop-auth.routes.events` is set; an app with its own route can use the controller directly. New config keys `events.hub_app`, `events.max_age`, `events.seen_ttl`, `routes.events`.
+
 ### Fixed
 
 - The sign-in start, callback and chained-logout routes no longer answer 500 when `next` or `ticket` arrives as an array (`/auth/sso?next[]=x`, `/auth/sso/callback?ticket[]=x`, `/auth/sso/logout?next[]=x`). A non-string value counts as absent: start goes on without a `next`, the callback answers 400, the logout goes home.
