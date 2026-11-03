@@ -4,6 +4,10 @@ All notable changes to `hop/auth` are listed here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+### Fixed
+
+- The sign-in start, callback and chained-logout routes no longer answer 500 when `next` or `ticket` arrives as an array (`/auth/sso?next[]=x`, `/auth/sso/callback?ticket[]=x`, `/auth/sso/logout?next[]=x`). A non-string value counts as absent: start goes on without a `next`, the callback answers 400, the logout goes home.
+
 ### Changed
 
 - Rewrote the README: removed the `hop.signed` middleware, which this package never contained, corrected the redirect target of `hop.auth`, and documented every config key, the sign-in round trip, the API token errors and scopes. Corrected the product page the same way.
