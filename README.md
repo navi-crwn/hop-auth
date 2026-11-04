@@ -11,6 +11,7 @@ The hub itself uses only the `ApiToken` model and the middleware aliases. The SS
 - The `hop.auth` middleware: like Laravel's `auth`, but a guest is sent through the hub instead of to a local login page.
 - The `hop.token` middleware: bearer API tokens from the shared `api_tokens` table, with scopes, expiry and an hourly rate limit per token.
 - A chained logout that only follows links to trusted hosts.
+- A receiver for the hub's account events (`POST /hop/events`): signature check, once-only event ids, and hooks for the app. Signing out at the hub, an admin ending sessions, a suspension or a deletion reach the app this way, even if the app was down when it happened.
 
 ## Requirements
 
@@ -76,6 +77,8 @@ php artisan vendor:publish --tag=hop-auth-config
 | `leeway` | `30` | Seconds of clock skew tolerated when checking a ticket's `exp` and `iat`. |
 | `home` | `/dashboard` | Where to land after sign-in when the app did not ask for a page. |
 | `api_rate_limit` | `100` | Requests per hour for an API token that has no limit of its own. |
+| `events.hub_app`, `events.max_age`, `events.seen_ttl` | `helink`, `120`, `172800` | Account events: the app slug the hub signs with, the seconds of clock difference tolerated (each nonce works once within twice this), and how long an event id is remembered. |
+| `routes.events` | `null` | Path of the account-event receiver. Off by default; see below. |
 | `routes.start`, `routes.callback`, `routes.logout` | `/auth/sso`, `/auth/sso/callback`, `/auth/sso/logout` | The route paths. Set `routes.start` to `null` to skip the package routes and register your own. |
 
 ## How a sign-in runs
@@ -139,6 +142,40 @@ The default list is the production family: `hel.ink`, `www.hel.ink`, `hub.hel.in
 ```ini
 HOP_TRUSTED_HOSTS=example.org,hub.example.org,link.example.org,bio.example.org
 ```
+
+## Account events from the hub
+
+The hub tells every app that declares the `events` capability when something happens to an account, with `POST {app}/hop/events` and a body `{id, type, at, data}`. It signs the request with the app's secret (HOP App Protocol v1: headers `X-HOP-App: helink`, `X-HOP-Timestamp`, `X-HOP-Nonce`, `X-HOP-Signature`), and retries with backoff for about sixteen hours when the answer is not a 2xx. The types:
+
+| Type | Sent when | Built in here |
+| --- | --- | --- |
+| `session.revoked` | the person signs out at the hub, or an admin ends their sessions | Ends every session of that account here and rotates its `remember_token`. |
+| `account.deleted` | the account is deleted | Ends every session of that account here. Delete the app's own data with a handler of yours. |
+| `account.status` | the status changes (`data.status`: `active`, `suspended`) | Nothing. LinkHop and BioHop already sign a suspended account out on its next request; add a handler if your app needs more. |
+| `profile.updated` | the profile changes | Nothing. |
+
+`data.sub` is the account id in the shared `users` table. Any other type gets a 200 `{handled: false}`, so the hub never retries what this app does not know.
+
+Why the remember token matters: the sign-in of this package uses `remember: true`, so deleting a person's session rows is not enough. The remember cookie (400 days by default) would sign them straight back in. `SessionRevoker` deletes the sessions (`database` and `file` drivers; other drivers cannot be searched by account, and `complete` is `false` in the result) and always rotates the token.
+
+Two ways to receive them:
+
+1. Set `routes.events` to `/hop/events`. The package registers the route behind `hop.event`, which checks the signature with the same `HOP_SSO_SECRET` and `HOP_SSO_SECRET_PREV` as the sign-in tickets, accepts a timestamp within `events.max_age` seconds, and spends each nonce once. Every refusal is the same bare `401 {"ok":false,"error":"unauthorized"}`.
+2. If the app already has a route with its own signature check, point it at `Hop\Auth\Http\Controllers\EventController` (a plain invokable controller). It checks the envelope, remembers each event id in the cache (a retry is answered `{duplicate: true}` and not handled twice) and runs the handlers. A handler that throws gives a 500 with no detail and the id is forgotten, so the hub's retry runs it again.
+
+Add your own handlers in a service provider:
+
+```php
+use Hop\Auth\HopEvents;
+
+HopEvents::on('account.deleted', fn (array $data, array $event) => $this->purge((int) $data['sub']));
+HopEvents::on('account.status', function (array $data) {
+    // return false when the event is not about anyone you know
+});
+HopEvents::forget('session.revoked'); // drop the built-in handler
+```
+
+The event ids need a cache store that survives between requests (`database`, `file`, `redis`), not `array`. The hub must have an `apps` row for the app with the `events` capability, or it sends nothing.
 
 ## Tests
 
