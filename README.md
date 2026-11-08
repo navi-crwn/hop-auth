@@ -1,5 +1,7 @@
 # hop/auth
 
+**English** · [简体中文](README.zh-CN.md) · [Deutsch](README.de.md) · [Bahasa Indonesia](README.id.md) · [日本語](README.ja.md) · [Português (Brasil)](README.pt-BR.md) · [Español](README.es.md) · [Français](README.fr.md) · [Русский](README.ru.md)
+
 The Laravel client for HOP ID, the account service of the HOP family ([hel.ink](https://hel.ink)). It lets an app in the family sign people in through the hub at `hub.hel.ink`, check the sign-in ticket the hub sends back, accept scoped API tokens, and sign people out again.
 
 The hub itself uses only the `ApiToken` model and the middleware aliases. The SSO routes are for the apps that consume HOP ID, such as LinkHop and BioHop.
@@ -189,6 +191,10 @@ Report vulnerabilities as described in [SECURITY.md](SECURITY.md), not in public
 
 See [CHANGELOG.md](CHANGELOG.md).
 
+## Self-hosting
+
+You do not install this package by hand to run HOP. LinkHop and BioHop list this public repository in their `composer.json`, so `composer install` fetches it with no token, and the hub ([HEL.ink](https://github.com/navi-crwn/HEL.ink)) carries a copy in `packages/auth`. An app that uses it needs a running hub on the same database and these settings: `HOP_HUB_URL`, `HOP_SSO_SECRET` (the hub's), `HOP_APP`, and on your own domain `HOP_TRUSTED_HOSTS`, because the default list holds only the hel.ink hosts. Imperium, the admin panel, is optional. The family guide covers the rest: [docs/self-hosting.md](https://github.com/navi-crwn/HEL.ink/blob/main/docs/self-hosting.md).
+
 ## HOP family
 
 <!-- hop-family:start -->
@@ -201,7 +207,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 | **PixelHop** | [pixel.hel.ink](https://pixel.hel.ink) · `p.hel.ink/…` | [navi-crwn/PixelHop](https://github.com/navi-crwn/PixelHop) | Image hosting with albums and direct links. |
 | **NoteHop** | [note.hel.ink](https://note.hel.ink) · `n.hel.ink/…` | [navi-crwn/NoteHop](https://github.com/navi-crwn/NoteHop) | Encrypted notes you share with a link. |
 | **FileHop** | [file.hel.ink](https://file.hel.ink) | [navi-crwn/FileHop](https://github.com/navi-crwn/FileHop) | Convert files in your browser; nothing is uploaded. |
-| **Imperium** | private (owner only) | private | The HOP control panel. |
+| **Imperium** | not public-facing: optional, for admins | [navi-crwn/Imperium](https://github.com/navi-crwn/Imperium) | The HOP control panel. |
 <!-- hop-family:end -->
 
 ## License
