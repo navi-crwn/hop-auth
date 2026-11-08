@@ -137,7 +137,7 @@ A `next` URL is trusted when all of this holds:
 
 The trusted hosts are `hop-auth.trusted_hosts` plus the hub (`HOP_HUB_URL`), this app (`APP_URL`), and the URLs in the shared `config/hop.php` (`hop.public_url`, `hop.hub_url` and each app's `url`).
 
-The default list is the production family: `hel.ink`, `www.hel.ink`, `hub.hel.ink`, `link.hel.ink`, `bio.hel.ink`, `note.hel.ink` and `pixel.hel.ink`. `HOP_TRUSTED_HOSTS` replaces that list. If you run the family on your own domain, set the hosts of your apps:
+The default list is the production family: `hel.ink`, `www.hel.ink`, `hub.hel.ink`, `link.hel.ink`, `bio.hel.ink`, `note.hel.ink`, `pixel.hel.ink` and `file.hel.ink`. `HOP_TRUSTED_HOSTS` replaces that list. If you run the family on your own domain, set the hosts of your apps:
 
 ```ini
 HOP_TRUSTED_HOSTS=example.org,hub.example.org,link.example.org,bio.example.org
@@ -200,6 +200,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 | **BioHop** | [bio.hel.ink](https://bio.hel.ink) · `hel.ink/b/…` | [navi-crwn/BioHop](https://github.com/navi-crwn/BioHop) | One link-in-bio page for everything you do. |
 | **PixelHop** | [pixel.hel.ink](https://pixel.hel.ink) · `p.hel.ink/…` | [navi-crwn/PixelHop](https://github.com/navi-crwn/PixelHop) | Image hosting with albums and direct links. |
 | **NoteHop** | [note.hel.ink](https://note.hel.ink) · `n.hel.ink/…` | [navi-crwn/NoteHop](https://github.com/navi-crwn/NoteHop) | Encrypted notes you share with a link. |
+| **FileHop** | [file.hel.ink](https://file.hel.ink) | [navi-crwn/FileHop](https://github.com/navi-crwn/FileHop) | Convert files in your browser; nothing is uploaded. |
 | **Imperium** | private (owner only) | private | The HOP control panel. |
 <!-- hop-family:end -->
 
