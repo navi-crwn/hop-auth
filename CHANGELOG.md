@@ -4,6 +4,8 @@ All notable changes to `hop/auth` are listed here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-10
+
 ### Added
 
 - `file.hel.ink` (FileHop) in the default `trusted_hosts`, so the chained logout passes on to FileHop. A family on its own domain sets `HOP_TRUSTED_HOSTS` as before.
