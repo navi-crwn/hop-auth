@@ -34,7 +34,7 @@ hub 本身只使用 `ApiToken` 模型和中间件别名。SSO 路由供使用 HO
     }
 ],
 "require": {
-    "hop/auth": "^0.1.2"
+    "hop/auth": "^0.2.0"
 }
 ```
 

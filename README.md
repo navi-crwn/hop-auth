@@ -34,7 +34,7 @@ The package is not on Packagist. Add the repository to the app's `composer.json`
     }
 ],
 "require": {
-    "hop/auth": "^0.1.2"
+    "hop/auth": "^0.2.0"
 }
 ```
 

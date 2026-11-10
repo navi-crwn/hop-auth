@@ -34,7 +34,7 @@ Le paquet n'est pas sur Packagist. Ajoutez le dépôt au `composer.json` de l'ap
     }
 ],
 "require": {
-    "hop/auth": "^0.1.2"
+    "hop/auth": "^0.2.0"
 }
 ```
 

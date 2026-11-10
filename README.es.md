@@ -34,7 +34,7 @@ El paquete no está en Packagist. Añade el repositorio al `composer.json` de la
     }
 ],
 "require": {
-    "hop/auth": "^0.1.2"
+    "hop/auth": "^0.2.0"
 }
 ```
 

@@ -34,7 +34,7 @@ Das Paket ist nicht auf Packagist. Füge das Repository zur `composer.json` der 
     }
 ],
 "require": {
-    "hop/auth": "^0.1.2"
+    "hop/auth": "^0.2.0"
 }
 ```
 

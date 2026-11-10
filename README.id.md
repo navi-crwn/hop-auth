@@ -34,7 +34,7 @@ Paket ini tidak ada di Packagist. Tambahkan repositori ke `composer.json` aplika
     }
 ],
 "require": {
-    "hop/auth": "^0.1.2"
+    "hop/auth": "^0.2.0"
 }
 ```
 

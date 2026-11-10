@@ -4,6 +4,8 @@ All notable changes to `hop/auth` are listed here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-11
+
 ### Added
 
 - `pay.hel.ink` (PayHop) in the default `trusted_hosts`, so the chained logout passes on to PayHop. A test checks that the default list holds every host of the family manifest (`tests/fixtures/hop-apps.json`).

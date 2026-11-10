@@ -34,7 +34,7 @@ HOP ID 用の Laravel クライアントです。HOP ID は HOP ファミリー�
     }
 ],
 "require": {
-    "hop/auth": "^0.1.2"
+    "hop/auth": "^0.2.0"
 }
 ```
 
