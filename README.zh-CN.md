@@ -67,6 +67,8 @@ HOP_SSO_SECRET=at-least-32-characters-shared-with-the-hub
 | `HOP_SSO_SECRET_PREV` | 无 | 上一个密钥，仅在轮换期间接受。 |
 | `HOP_USER_MODEL` | `App\Models\User` | 登录所用的模型，也是 API 令牌的所有者。 |
 | `HOP_TRUSTED_HOSTS` | 生产环境的家族主机 | 链式退出登录可以重定向到的主机。见下文。 |
+| `HOP_RECHECK` | `true` | 页面加载时的静默账号复核(`false` 关闭)。见下文。 |
+| `HOP_RECHECK_MAX_AGE` | `300` | hub 最近一次确认后,会话被视为“新鲜”的秒数。`0` 关闭复核。 |
 
 其余选项没有对应的环境变量。如需修改，请发布配置文件：
 
@@ -127,6 +129,16 @@ Route::middleware('hop.token:link:create')->post('/api/links', StoreLinkControll
 
 被拒绝的请求会收到 `429`，响应体中带有 `retry_after`，并带有对应的 `Retry-After` 请求头，两者都是距窗口结束的秒数。
 
+## 静默账号复核
+
+你的应用里的会话可能比此人在 hub 上的账号活得更久:他在 hub 上换了账号登录或退出登录,而你的应用仍然保留旧账号。`hop.auth` 无需迁移即可堵上这个缺口:
+
+- 会话在 hub 最近一次确认(通过一次登录或一次静默应答)之后的 `recheck.max_age` 秒内(默认 300)是**新鲜**的。时间保存在会话里。
+- 不新鲜时,加载页面(不是 XHR、不是 JSON、也不是预取的 `GET`)会向 hub 做一次 `prompt=none` 往返([静默 SSO](https://github.com/navi-crwn/HEL.ink/blob/main/docs/silent-sso.md))。账号相同:页面照常加载,毫无察觉。账号不同:会话切换到该账号。`login_required`:此人在这里退出登录,以访客身份看到该页面。受保护的页面随后开始正常登录;公开页面则完全不显示登录。
+- 保护措施:POST 或 XHR 请求绝不重定向。hub 不接受连接时不重定向(一次简短探测,缓存 30 秒)。每 `recheck.cooldown` 秒(30)最多尝试一次,因此不会死循环。hub 的其他错误,例如 `temporarily_unavailable`,会保留会话并等待 `recheck.retry_after` 秒(300)。`state` 必须是该会话发起的那个。
+- 不需要登录但会显示账号的页面(带“控制台”按钮的首页),请在其中间件里加上 `hop.recheck`,这样它们也会被复核。
+- 配置项在 `hop-auth.recheck`(`enabled`、`max_age`、`cooldown`、`retry_after`、`probe`、`probe_timeout`)。`HOP_RECHECK=false` 关闭全部复核。
+
 ## 链式退出登录与受信任主机
 
 `/auth/sso/logout` 让用户在本应用退出登录，使会话失效，并重新生成 CSRF 令牌。如果 `?next=` 中是受信任的 URL，随后会重定向过去，hub 正是这样让用户从每个应用退出登录的。其他情况都会跳转到 `/`。
@@ -139,7 +151,7 @@ Route::middleware('hop.token:link:create')->post('/api/links', StoreLinkControll
 
 受信任主机包括 `hop-auth.trusted_hosts`，加上 hub（`HOP_HUB_URL`）、本应用（`APP_URL`），以及共享的 `config/hop.php` 中的 URL（`hop.public_url`、`hop.hub_url` 和每个应用的 `url`）。
 
-默认列表是生产环境的家族：`hel.ink`、`www.hel.ink`、`hub.hel.ink`、`link.hel.ink`、`bio.hel.ink`、`note.hel.ink`、`pixel.hel.ink` 和 `file.hel.ink`。`HOP_TRUSTED_HOSTS` 会替换该列表。如果你在自己的域名上运行这个家族，请设置你的应用的主机：
+默认列表是生产环境的家族：`hel.ink`、`www.hel.ink`、`hub.hel.ink`、`link.hel.ink`、`bio.hel.ink`、`note.hel.ink`、`pixel.hel.ink`、`file.hel.ink` 和 `pay.hel.ink`。`HOP_TRUSTED_HOSTS` 会替换该列表。如果你在自己的域名上运行这个家族，请设置你的应用的主机：
 
 ```ini
 HOP_TRUSTED_HOSTS=example.org,hub.example.org,link.example.org,bio.example.org

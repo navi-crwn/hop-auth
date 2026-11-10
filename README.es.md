@@ -67,6 +67,8 @@ HOP_SSO_SECRET=at-least-32-characters-shared-with-the-hub
 | `HOP_SSO_SECRET_PREV` | ninguno | El secreto anterior, aceptado solo mientras haces la rotación. |
 | `HOP_USER_MODEL` | `App\Models\User` | El modelo que inicia sesión y el propietario de un token de API. |
 | `HOP_TRUSTED_HOSTS` | los hosts de la familia en producción | Hosts a los que puede redirigir el cierre de sesión encadenado. Ver más abajo. |
+| `HOP_RECHECK` | `true` | Comprobación silenciosa de la cuenta al cargar páginas (`false` la desactiva). Ver más abajo. |
+| `HOP_RECHECK_MAX_AGE` | `300` | Segundos que una sesión cuenta como reciente desde que el hub la avaló por última vez. `0` desactiva la comprobación. |
 
 El resto de opciones no tiene variable de entorno. Publica el archivo de configuración para cambiarlas:
 
@@ -127,6 +129,16 @@ Cada token puede hacer `rate_limit` peticiones por hora. Un token cuyo `rate_lim
 
 Una petición rechazada recibe un `429` con `retry_after` en el cuerpo y una cabecera `Retry-After` equivalente, ambos en segundos hasta que termine la ventana.
 
+## Comprobación silenciosa de la cuenta
+
+Una sesión de tu app puede sobrevivir a la cuenta que la persona tiene en el hub: si entra en el hub con otra cuenta, o sale, tu app conserva la cuenta anterior. `hop.auth` cierra esa brecha sin migración:
+
+- La sesión es **reciente** durante `recheck.max_age` segundos (300 por defecto) desde que el hub la avaló por última vez, con un inicio de sesión o con una respuesta silenciosa. La hora se guarda en la sesión.
+- Si no es reciente, al cargar una página (un `GET` que no sea XHR ni JSON ni una precarga) se hace un único viaje `prompt=none` al hub ([SSO silencioso](https://github.com/navi-crwn/HEL.ink/blob/main/docs/silent-sso.md)). Misma cuenta: la página carga como si nada. Otra cuenta: la sesión cambia a ella. `login_required`: se cierra la sesión aquí y la persona ve la página como invitada. Una página protegida inicia entonces el inicio de sesión normal; una página pública no muestra ningún inicio de sesión.
+- Salvaguardas: un POST o una petición XHR nunca se redirige. No se redirige mientras el hub no acepte conexiones (una sonda breve, en caché 30 segundos). Como máximo un intento cada `recheck.cooldown` segundos (30), así que no hay bucles. Cualquier otro error del hub, como `temporarily_unavailable`, conserva la sesión y espera `recheck.retry_after` segundos (300). El `state` debe ser el que inició la sesión.
+- Las páginas que no exigen sesión pero muestran la cuenta (una portada con un botón «Panel») llevan `hop.recheck` en su middleware, para que también se comprueben.
+- Las claves están en `hop-auth.recheck` (`enabled`, `max_age`, `cooldown`, `retry_after`, `probe`, `probe_timeout`). `HOP_RECHECK=false` desactiva toda la comprobación.
+
 ## Cierre de sesión encadenado y hosts de confianza
 
 `/auth/sso/logout` cierra la sesión de la persona aquí, invalida la sesión y regenera el token CSRF. Si `?next=` contiene una URL de confianza, después redirige allí. Así es como el hub cierra la sesión de una persona en todas las apps. Cualquier otra cosa va a `/`.
@@ -139,7 +151,7 @@ Una URL `next` es de confianza cuando se cumple todo esto:
 
 Los hosts de confianza son `hop-auth.trusted_hosts` más el hub (`HOP_HUB_URL`), esta app (`APP_URL`) y las URLs del `config/hop.php` compartido (`hop.public_url`, `hop.hub_url` y la `url` de cada app).
 
-La lista por defecto es la familia en producción: `hel.ink`, `www.hel.ink`, `hub.hel.ink`, `link.hel.ink`, `bio.hel.ink`, `note.hel.ink`, `pixel.hel.ink` y `file.hel.ink`. `HOP_TRUSTED_HOSTS` sustituye esa lista. Si ejecutas la familia en tu propio dominio, define los hosts de tus apps:
+La lista por defecto es la familia en producción: `hel.ink`, `www.hel.ink`, `hub.hel.ink`, `link.hel.ink`, `bio.hel.ink`, `note.hel.ink`, `pixel.hel.ink`, `file.hel.ink` y `pay.hel.ink`. `HOP_TRUSTED_HOSTS` sustituye esa lista. Si ejecutas la familia en tu propio dominio, define los hosts de tus apps:
 
 ```ini
 HOP_TRUSTED_HOSTS=example.org,hub.example.org,link.example.org,bio.example.org

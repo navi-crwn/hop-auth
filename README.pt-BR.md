@@ -67,6 +67,8 @@ HOP_SSO_SECRET=at-least-32-characters-shared-with-the-hub
 | `HOP_SSO_SECRET_PREV` | nenhum | O segredo anterior, aceito apenas enquanto você faz a rotação. |
 | `HOP_USER_MODEL` | `App\Models\User` | O model que faz login e o dono de um token de API. |
 | `HOP_TRUSTED_HOSTS` | os hosts da família em produção | Hosts para os quais o logout encadeado pode redirecionar. Veja abaixo. |
+| `HOP_RECHECK` | `true` | Verificação silenciosa da conta ao carregar páginas (`false` desliga). Veja abaixo. |
+| `HOP_RECHECK_MAX_AGE` | `300` | Segundos em que uma sessão conta como recente desde a última vez que o hub a validou. `0` desliga a verificação. |
 
 As demais opções não têm variável de ambiente. Publique o arquivo de configuração para alterá-las:
 
@@ -127,6 +129,16 @@ Cada token pode fazer `rate_limit` requisições por hora. Um token cujo `rate_l
 
 Uma requisição recusada recebe um `429` com `retry_after` no corpo e um cabeçalho `Retry-After` correspondente, ambos em segundos até o fim da janela.
 
+## Verificação silenciosa da conta
+
+Uma sessão no seu app pode durar mais que a conta que a pessoa tem no hub: ela entra no hub com outra conta, ou sai, e o seu app continua com a conta antiga. O `hop.auth` fecha essa brecha sem migração:
+
+- A sessão é **recente** por `recheck.max_age` segundos (padrão 300) desde a última validação do hub, por um login ou por uma resposta silenciosa. A hora fica guardada na sessão.
+- Quando não é recente, o carregamento de uma página (um `GET` que não seja XHR, nem JSON, nem pré-carregamento) faz uma única ida ao hub com `prompt=none` ([SSO silencioso](https://github.com/navi-crwn/HEL.ink/blob/main/docs/silent-sso.md)). Mesma conta: a página carrega como se nada tivesse acontecido. Outra conta: a sessão troca para ela. `login_required`: a pessoa é desconectada aqui e vê a página como visitante. Uma página protegida então inicia o login normal; uma página pública não mostra login algum.
+- Salvaguardas: um POST ou uma requisição XHR nunca é redirecionado. Nada é redirecionado enquanto o hub não aceita conexão (uma sondagem curta, em cache por 30 segundos). No máximo uma tentativa a cada `recheck.cooldown` segundos (30), então não há laço. Qualquer outro erro do hub, como `temporarily_unavailable`, mantém a sessão e espera `recheck.retry_after` segundos (300). O `state` precisa ser o que a sessão iniciou.
+- Páginas que não exigem login mas mostram a conta (uma página inicial com um botão "Painel") recebem `hop.recheck` no middleware, para serem verificadas também.
+- As chaves estão em `hop-auth.recheck` (`enabled`, `max_age`, `cooldown`, `retry_after`, `probe`, `probe_timeout`). `HOP_RECHECK=false` desliga toda a verificação.
+
 ## Logout encadeado e hosts confiáveis
 
 `/auth/sso/logout` faz o logout da pessoa aqui, invalida a sessão e regenera o token CSRF. Se `?next=` contém uma URL confiável, ele então redireciona para lá. É assim que o hub faz o logout de uma pessoa em todos os apps. Qualquer outra coisa vai para `/`.
@@ -139,7 +151,7 @@ Uma URL `next` é confiável quando tudo isto vale:
 
 Os hosts confiáveis são `hop-auth.trusted_hosts` mais o hub (`HOP_HUB_URL`), este app (`APP_URL`) e as URLs no `config/hop.php` compartilhado (`hop.public_url`, `hop.hub_url` e a `url` de cada app).
 
-A lista padrão é a família em produção: `hel.ink`, `www.hel.ink`, `hub.hel.ink`, `link.hel.ink`, `bio.hel.ink`, `note.hel.ink`, `pixel.hel.ink` e `file.hel.ink`. `HOP_TRUSTED_HOSTS` substitui essa lista. Se você roda a família no seu próprio domínio, defina os hosts dos seus apps:
+A lista padrão é a família em produção: `hel.ink`, `www.hel.ink`, `hub.hel.ink`, `link.hel.ink`, `bio.hel.ink`, `note.hel.ink`, `pixel.hel.ink`, `file.hel.ink` e `pay.hel.ink`. `HOP_TRUSTED_HOSTS` substitui essa lista. Se você roda a família no seu próprio domínio, defina os hosts dos seus apps:
 
 ```ini
 HOP_TRUSTED_HOSTS=example.org,hub.example.org,link.example.org,bio.example.org
