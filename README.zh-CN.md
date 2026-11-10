@@ -135,9 +135,9 @@ Route::middleware('hop.token:link:create')->post('/api/links', StoreLinkControll
 
 - 会话在 hub 最近一次确认(通过一次登录或一次静默应答)之后的 `recheck.max_age` 秒内(默认 300)是**新鲜**的。时间保存在会话里。
 - 不新鲜时,加载页面(不是 XHR、不是 JSON、也不是预取的 `GET`)会向 hub 做一次 `prompt=none` 往返([静默 SSO](https://github.com/navi-crwn/HEL.ink/blob/main/docs/silent-sso.md))。账号相同:页面照常加载,毫无察觉。账号不同:会话切换到该账号。`login_required`:此人在这里退出登录,以访客身份看到该页面。受保护的页面随后开始正常登录;公开页面则完全不显示登录。
-- 保护措施:POST 或 XHR 请求绝不重定向。hub 不接受连接时不重定向(一次简短探测,缓存 30 秒)。每 `recheck.cooldown` 秒(30)最多尝试一次,因此不会死循环。hub 的其他错误,例如 `temporarily_unavailable`,会保留会话并等待 `recheck.retry_after` 秒(300)。`state` 必须是该会话发起的那个。
+- 保护措施:POST 或 XHR 请求绝不重定向。hub 的健康检查地址(`/up`)没有返回 2xx 时(例如 502 或超时),不重定向也不让任何人退出登录:会话仍被信任,缓存的判定过期(60 秒)后的下一次页面加载会再试。每 `recheck.cooldown` 秒(30)最多尝试一次,因此不会死循环。hub 的其他错误,例如 `temporarily_unavailable`,会保留会话并等待 `recheck.retry_after` 秒(300)。`state` 必须是该会话发起的那个。
 - 不需要登录但会显示账号的页面(带“控制台”按钮的首页),请在其中间件里加上 `hop.recheck`,这样它们也会被复核。
-- 配置项在 `hop-auth.recheck`(`enabled`、`max_age`、`cooldown`、`retry_after`、`probe`、`probe_timeout`)。`HOP_RECHECK=false` 关闭全部复核。
+- 配置项在 `hop-auth.recheck`(`enabled`、`max_age`、`cooldown`、`retry_after`、`probe`、`probe_path`、`probe_timeout`、`probe_ttl`)。`HOP_RECHECK=false` 关闭全部复核。
 
 ## 链式退出登录与受信任主机
 

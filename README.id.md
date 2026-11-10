@@ -135,9 +135,9 @@ Sesi di aplikasi Anda bisa bertahan lebih lama daripada akun yang dipakai orang 
 
 - Sesi dianggap **segar** selama `recheck.max_age` detik (bawaan 300) sejak hub terakhir mengesahkannya, lewat proses masuk atau jawaban senyap. Waktunya disimpan di sesi.
 - Bila tidak segar, pemuatan halaman (sebuah `GET` yang bukan XHR, bukan JSON, dan bukan prefetch) melakukan satu perjalanan `prompt=none` ke hub ([SSO senyap](https://github.com/navi-crwn/HEL.ink/blob/main/docs/silent-sso.md)). Akun sama: halaman dimuat seolah tidak terjadi apa-apa. Akun lain: sesi berganti ke akun itu. `login_required`: orang itu dikeluarkan dari sini dan melihat halaman sebagai tamu. Halaman terlindung lalu memulai proses masuk biasa; halaman publik tidak menampilkan proses masuk sama sekali.
-- Pengaman: permintaan POST atau XHR tidak pernah dialihkan. Tidak ada pengalihan selama hub tidak menerima koneksi (pemeriksaan singkat, disimpan 30 detik). Paling banyak satu percobaan per `recheck.cooldown` detik (30), jadi tidak ada loop. Galat hub lain, misalnya `temporarily_unavailable`, mempertahankan sesi dan menunggu `recheck.retry_after` detik (300). `state` harus sama dengan yang dimulai sesi.
+- Pengaman: permintaan POST atau XHR tidak pernah dialihkan. Selama hub tidak menjawab URL kesehatannya (`/up`) dengan 2xx, misalnya 502 atau waktu habis, tidak ada pengalihan dan tidak ada yang dikeluarkan: sesi tetap dipercaya, dan pemuatan halaman berikutnya setelah hasil cache kedaluwarsa (60 detik) mencoba lagi. Paling banyak satu percobaan per `recheck.cooldown` detik (30), jadi tidak ada loop. Galat hub lain, misalnya `temporarily_unavailable`, mempertahankan sesi dan menunggu `recheck.retry_after` detik (300). `state` harus sama dengan yang dimulai sesi.
 - Halaman yang tidak memerlukan login tetapi menampilkan akun (halaman depan dengan tombol "Dasbor") diberi `hop.recheck` di middleware-nya agar ikut diperiksa.
-- Kuncinya ada di `hop-auth.recheck` (`enabled`, `max_age`, `cooldown`, `retry_after`, `probe`, `probe_timeout`). `HOP_RECHECK=false` mematikan seluruh pengecekan.
+- Kuncinya ada di `hop-auth.recheck` (`enabled`, `max_age`, `cooldown`, `retry_after`, `probe`, `probe_path`, `probe_timeout`, `probe_ttl`). `HOP_RECHECK=false` mematikan seluruh pengecekan.
 
 ## Logout berantai dan host tepercaya
 

@@ -135,9 +135,9 @@ Route::middleware('hop.token:link:create')->post('/api/links', StoreLinkControll
 
 - セッションは、ハブが最後に保証してから `recheck.max_age` 秒(既定 300)のあいだ**新しい**とみなされます。保証はサインインまたはサイレントな応答で行われ、時刻はセッションに保存されます。
 - 新しくない場合、ページの読み込み(XHR でも JSON でもプリフェッチでもない `GET`)で、ハブへ `prompt=none` の往復を 1 回だけ行います([サイレント SSO](https://github.com/navi-crwn/HEL.ink/blob/main/docs/silent-sso.md))。同じアカウント: 何事もなかったようにページが読み込まれます。別のアカウント: セッションがそのアカウントに切り替わります。`login_required`: ここでサインアウトされ、ゲストとしてそのページが表示されます。保護されたページは通常のサインインを始め、公開ページにはサインイン画面は一切表示されません。
-- 安全策: POST や XHR リクエストはリダイレクトされません。ハブが接続を受け付けない間はリダイレクトしません(短い疎通確認を 30 秒キャッシュ)。試行は `recheck.cooldown` 秒(30)に最大 1 回なので、ループしません。`temporarily_unavailable` など他のハブのエラーは、セッションを保ったまま `recheck.retry_after` 秒(300)待ちます。`state` はセッションが開始したものと一致する必要があります。
+- 安全策: POST や XHR リクエストはリダイレクトされません。ハブがヘルス URL(`/up`)に 2xx で応答しない間(502 やタイムアウトなど)は、リダイレクトもサインアウトもしません。セッションは信頼されたままで、キャッシュした判定の期限(60 秒)が切れたあとの次のページ読み込みで再試行します。試行は `recheck.cooldown` 秒(30)に最大 1 回なので、ループしません。`temporarily_unavailable` など他のハブのエラーは、セッションを保ったまま `recheck.retry_after` 秒(300)待ちます。`state` はセッションが開始したものと一致する必要があります。
 - サインイン不要でもアカウントを表示するページ(「ダッシュボード」ボタンのあるトップページなど)は、ミドルウェアに `hop.recheck` を付けると同様に確認されます。
-- キーは `hop-auth.recheck`(`enabled`、`max_age`、`cooldown`、`retry_after`、`probe`、`probe_timeout`)にあります。`HOP_RECHECK=false` で確認全体を無効にできます。
+- キーは `hop-auth.recheck`(`enabled`、`max_age`、`cooldown`、`retry_after`、`probe`、`probe_path`、`probe_timeout`、`probe_ttl`)にあります。`HOP_RECHECK=false` で確認全体を無効にできます。
 
 ## 連鎖ログアウトと信頼できるホスト
 

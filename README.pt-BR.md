@@ -135,9 +135,9 @@ Uma sessão no seu app pode durar mais que a conta que a pessoa tem no hub: ela 
 
 - A sessão é **recente** por `recheck.max_age` segundos (padrão 300) desde a última validação do hub, por um login ou por uma resposta silenciosa. A hora fica guardada na sessão.
 - Quando não é recente, o carregamento de uma página (um `GET` que não seja XHR, nem JSON, nem pré-carregamento) faz uma única ida ao hub com `prompt=none` ([SSO silencioso](https://github.com/navi-crwn/HEL.ink/blob/main/docs/silent-sso.md)). Mesma conta: a página carrega como se nada tivesse acontecido. Outra conta: a sessão troca para ela. `login_required`: a pessoa é desconectada aqui e vê a página como visitante. Uma página protegida então inicia o login normal; uma página pública não mostra login algum.
-- Salvaguardas: um POST ou uma requisição XHR nunca é redirecionado. Nada é redirecionado enquanto o hub não aceita conexão (uma sondagem curta, em cache por 30 segundos). No máximo uma tentativa a cada `recheck.cooldown` segundos (30), então não há laço. Qualquer outro erro do hub, como `temporarily_unavailable`, mantém a sessão e espera `recheck.retry_after` segundos (300). O `state` precisa ser o que a sessão iniciou.
+- Salvaguardas: um POST ou uma requisição XHR nunca é redirecionado. Enquanto o hub não responder 2xx na sua URL de saúde (`/up`), por exemplo com 502 ou tempo esgotado, nada é redirecionado e ninguém é desconectado: a sessão continua confiável e o próximo carregamento de página após expirar o veredito em cache (60 segundos) tenta de novo. No máximo uma tentativa a cada `recheck.cooldown` segundos (30), então não há laço. Qualquer outro erro do hub, como `temporarily_unavailable`, mantém a sessão e espera `recheck.retry_after` segundos (300). O `state` precisa ser o que a sessão iniciou.
 - Páginas que não exigem login mas mostram a conta (uma página inicial com um botão "Painel") recebem `hop.recheck` no middleware, para serem verificadas também.
-- As chaves estão em `hop-auth.recheck` (`enabled`, `max_age`, `cooldown`, `retry_after`, `probe`, `probe_timeout`). `HOP_RECHECK=false` desliga toda a verificação.
+- As chaves estão em `hop-auth.recheck` (`enabled`, `max_age`, `cooldown`, `retry_after`, `probe`, `probe_path`, `probe_timeout`, `probe_ttl`). `HOP_RECHECK=false` desliga toda a verificação.
 
 ## Logout encadeado e hosts confiáveis
 
