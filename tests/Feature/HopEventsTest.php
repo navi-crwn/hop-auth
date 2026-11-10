@@ -307,6 +307,7 @@ test('the receiver route is off until the app names a path for it', function () 
     expect(config('hop-auth.routes.events'))->toBeNull();
     expect(collect(Route::getRoutes()->getRoutes())->contains(fn ($r) => $r->getName() === 'hop.events'))->toBeFalse();
 
+    config()->set('hop.current', 'linkhop'); // the hub never mounts the receiver; this test is about an app
     config()->set('hop-auth.routes.events', '/hooks/hop');
     $this->app->register(AuthServiceProvider::class, force: true);
     Route::getRoutes()->refreshNameLookups();
