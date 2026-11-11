@@ -4,6 +4,17 @@ All notable changes to `hop/auth` are listed here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-11
+
+### Added
+
+- `pay.hel.ink` (PayHop) in the default `trusted_hosts`, so the chained logout passes on to PayHop. A test checks that the default list holds every host of the family manifest (`tests/fixtures/hop-apps.json`).
+- Silent account re-check. A session the hub has not vouched for in the last `hop-auth.recheck.max_age` seconds (default 300) is confirmed with one `prompt=none` round trip on the next page load (`GET`, not XHR or JSON, not a prefetch). Same account: nothing visible. Another account: the session switches to it. `login_required`: signed out here, landing on the page as a guest (no sign-in page for a public page). Safeguards: no redirect and no sign-out unless the hub health URL (`/up`) answers 2xx within `recheck.probe_timeout` (the verdict is cached `recheck.probe_ttl` seconds; a 502 or a timeout leaves the session trusted), at most one attempt per `recheck.cooldown` seconds, any other hub error keeps the session and waits `recheck.retry_after` seconds, and the `state` is checked. No migration: the timestamps live in the session. New `hop.recheck` middleware for public pages that show the account; `hop.auth` does the check itself. New config `recheck.*` and env `HOP_RECHECK`, `HOP_RECHECK_MAX_AGE`.
+
+### Fixed
+
+- A session in an app kept the old account after the person switched accounts at the hub, because `hop.auth` let every signed-in user through without asking the hub (the gap the re-check closes).
+
 ## [0.1.5] - 2026-11-10
 
 ### Added

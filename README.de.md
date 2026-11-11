@@ -34,7 +34,7 @@ Das Paket ist nicht auf Packagist. Füge das Repository zur `composer.json` der 
     }
 ],
 "require": {
-    "hop/auth": "^0.1.2"
+    "hop/auth": "^0.2.0"
 }
 ```
 
@@ -67,6 +67,8 @@ HOP_SSO_SECRET=at-least-32-characters-shared-with-the-hub
 | `HOP_SSO_SECRET_PREV` | keiner | Das vorherige Secret, nur während der Rotation akzeptiert. |
 | `HOP_USER_MODEL` | `App\Models\User` | Das Modell, das angemeldet wird, und der Besitzer eines API-Tokens. |
 | `HOP_TRUSTED_HOSTS` | die Hosts der Produktionsfamilie | Hosts, zu denen der verkettete Logout weiterleiten darf. Siehe unten. |
+| `HOP_RECHECK` | `true` | Stille Kontoprüfung beim Seitenaufruf (`false` schaltet sie ab). Siehe unten. |
+| `HOP_RECHECK_MAX_AGE` | `300` | Sekunden, die eine Sitzung als frisch gilt, nachdem der Hub sie zuletzt bestätigt hat. `0` schaltet die Prüfung ab. |
 
 Die übrigen Optionen haben keine Umgebungsvariable. Veröffentliche die Konfigurationsdatei, um sie zu ändern:
 
@@ -127,6 +129,16 @@ Jedes Token darf `rate_limit` Anfragen pro Stunde stellen. Ein Token, dessen `ra
 
 Eine abgelehnte Anfrage bekommt eine `429` mit `retry_after` im Body und einem passenden `Retry-After`-Header, beide in Sekunden bis zum Ende des Fensters.
 
+## Stille Kontoprüfung
+
+Eine Sitzung in deiner App kann das Konto überdauern, das die Person am Hub hat: Meldet sie sich am Hub als jemand anderes an oder ab, behält deine App das alte Konto. `hop.auth` schließt diese Lücke ohne Migration:
+
+- Die Sitzung ist `recheck.max_age` Sekunden lang (Standard 300) **frisch**, nachdem der Hub sie zuletzt bestätigt hat, durch eine Anmeldung oder eine stille Antwort. Der Zeitpunkt steht in der Sitzung.
+- Ist sie nicht frisch, macht ein Seitenaufruf (ein `GET`, der weder XHR noch JSON noch ein Prefetch ist) genau eine `prompt=none`-Runde zum Hub ([Silent SSO](https://github.com/navi-crwn/HEL.ink/blob/main/docs/silent-sso.md)). Gleiches Konto: Die Seite lädt, als wäre nichts geschehen. Anderes Konto: Die Sitzung wechselt dorthin. `login_required`: Die Person wird hier abgemeldet und sieht die Seite als Gast. Eine geschützte Seite startet dann die normale Anmeldung; eine öffentliche Seite zeigt gar keine Anmeldung.
+- Schutzmaßnahmen: Ein POST oder XHR-Request wird nie umgeleitet. Solange der Hub seine Health-URL (`/up`) nicht mit 2xx beantwortet, etwa bei 502 oder Timeout, wird nichts umgeleitet und niemand abgemeldet: Die Sitzung bleibt vertrauenswürdig, und der nächste Seitenaufruf nach Ablauf des zwischengespeicherten Urteils (60 Sekunden) versucht es erneut. Höchstens ein Versuch pro `recheck.cooldown` Sekunden (30), also keine Schleife. Jeder andere Hub-Fehler, etwa `temporarily_unavailable`, behält die Sitzung und wartet `recheck.retry_after` Sekunden (300). Der `state` muss der sein, den die Sitzung gestartet hat.
+- Seiten ohne Anmeldepflicht, die das Konto zeigen (eine Startseite mit „Dashboard“-Button), bekommen `hop.recheck` in ihre Middleware und werden so ebenfalls geprüft.
+- Die Schlüssel stehen in `hop-auth.recheck` (`enabled`, `max_age`, `cooldown`, `retry_after`, `probe`, `probe_path`, `probe_timeout`, `probe_ttl`). `HOP_RECHECK=false` schaltet die ganze Prüfung ab.
+
 ## Verketteter Logout und vertrauenswürdige Hosts
 
 `/auth/sso/logout` meldet die Person hier ab, macht die Session ungültig und erneuert das CSRF-Token. Wenn `?next=` eine vertrauenswürdige URL enthält, leitet es danach dorthin weiter. So meldet der Hub eine Person in jeder App ab. Alles andere geht zu `/`.
@@ -139,7 +151,7 @@ Eine `next`-URL ist vertrauenswürdig, wenn all das gilt:
 
 Die vertrauenswürdigen Hosts sind `hop-auth.trusted_hosts` plus der Hub (`HOP_HUB_URL`), diese App (`APP_URL`) und die URLs in der gemeinsamen `config/hop.php` (`hop.public_url`, `hop.hub_url` und die `url` jeder App).
 
-Die Standardliste ist die Produktionsfamilie: `hel.ink`, `www.hel.ink`, `hub.hel.ink`, `link.hel.ink`, `bio.hel.ink`, `note.hel.ink`, `pixel.hel.ink` und `file.hel.ink`. `HOP_TRUSTED_HOSTS` ersetzt diese Liste. Wenn du die Familie auf deiner eigenen Domain betreibst, setze die Hosts deiner Apps:
+Die Standardliste ist die Produktionsfamilie: `hel.ink`, `www.hel.ink`, `hub.hel.ink`, `link.hel.ink`, `bio.hel.ink`, `note.hel.ink`, `pixel.hel.ink`, `file.hel.ink` und `pay.hel.ink`. `HOP_TRUSTED_HOSTS` ersetzt diese Liste. Wenn du die Familie auf deiner eigenen Domain betreibst, setze die Hosts deiner Apps:
 
 ```ini
 HOP_TRUSTED_HOSTS=example.org,hub.example.org,link.example.org,bio.example.org
@@ -207,6 +219,7 @@ Du installierst dieses Paket nicht von Hand, um HOP zu betreiben. LinkHop und Bi
 | **PixelHop** | [pixel.hel.ink](https://pixel.hel.ink) · `p.hel.ink/…` | [navi-crwn/PixelHop](https://github.com/navi-crwn/PixelHop) | Image hosting with albums and direct links. |
 | **NoteHop** | [note.hel.ink](https://note.hel.ink) · `n.hel.ink/…` | [navi-crwn/NoteHop](https://github.com/navi-crwn/NoteHop) | Encrypted notes you share with a link. |
 | **FileHop** | [file.hel.ink](https://file.hel.ink) | [navi-crwn/FileHop](https://github.com/navi-crwn/FileHop) | Convert files in your browser; nothing is uploaded. |
+| **PayHop** | [pay.hel.ink](https://pay.hel.ink) | [navi-crwn/PayHop](https://github.com/navi-crwn/PayHop) | Make a payment QR and split a bill; nothing leaves your browser. |
 | **Imperium** | not public-facing: optional, for admins | [navi-crwn/Imperium](https://github.com/navi-crwn/Imperium) | The HOP control panel. |
 <!-- hop-family:end -->
 

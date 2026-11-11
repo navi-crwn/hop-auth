@@ -34,7 +34,7 @@
     }
 ],
 "require": {
-    "hop/auth": "^0.1.2"
+    "hop/auth": "^0.2.0"
 }
 ```
 
@@ -67,6 +67,8 @@ HOP_SSO_SECRET=at-least-32-characters-shared-with-the-hub
 | `HOP_SSO_SECRET_PREV` | нет | Предыдущий секрет; принимается только на время ротации. |
 | `HOP_USER_MODEL` | `App\Models\User` | Модель, которая входит в систему, и владелец API-токена. |
 | `HOP_TRUSTED_HOSTS` | хосты семейства в продакшене | Хосты, на которые может перенаправлять цепочка выхода. См. ниже. |
+| `HOP_RECHECK` | `true` | Тихая перепроверка учётной записи при загрузке страниц (`false` отключает её). См. ниже. |
+| `HOP_RECHECK_MAX_AGE` | `300` | Сколько секунд сессия считается свежей после последнего подтверждения хабом. `0` отключает перепроверку. |
 
 У остальных параметров нет переменной окружения. Чтобы их изменить, опубликуйте файл конфигурации:
 
@@ -127,6 +129,16 @@ Route::middleware('hop.token:link:create')->post('/api/links', StoreLinkControll
 
 Отклонённый запрос получает `429` с `retry_after` в теле и соответствующим заголовком `Retry-After`; оба значения — в секундах до конца окна.
 
+## Тихая перепроверка учётной записи
+
+Сессия в вашем приложении может пережить учётную запись, которая у человека на хабе: он входит на хабе под другой записью или выходит, а приложение остаётся со старой. `hop.auth` закрывает эту брешь без миграции:
+
+- Сессия **свежая** `recheck.max_age` секунд (по умолчанию 300) после последнего подтверждения хабом: входом или тихим ответом. Время хранится в сессии.
+- Если сессия не свежая, загрузка страницы (`GET`, который не XHR, не JSON и не предзагрузка) делает один обход к хабу с `prompt=none` ([тихий SSO](https://github.com/navi-crwn/HEL.ink/blob/main/docs/silent-sso.md)). Та же запись: страница загружается как ни в чём не бывало. Другая запись: сессия переключается на неё. `login_required`: человек выходит здесь и видит страницу как гость. Защищённая страница затем запускает обычный вход; публичная страница не показывает вход вообще.
+- Предохранители: POST и XHR-запросы никогда не перенаправляются. Пока хаб не отвечает 2xx на свой health-URL (`/up`), например 502 или таймаутом, ничего не перенаправляется и никто не разлогинивается: сессия остаётся доверенной, а следующая загрузка страницы после истечения кэшированного вердикта (60 секунд) пробует снова. Не более одной попытки за `recheck.cooldown` секунд (30), поэтому цикла не будет. Любая другая ошибка хаба, например `temporarily_unavailable`, сохраняет сессию и ждёт `recheck.retry_after` секунд (300). `state` должен быть тем, что начала сессия.
+- Страницы без обязательного входа, показывающие учётную запись (главная с кнопкой «Панель»), получают `hop.recheck` в middleware и тоже проверяются.
+- Ключи лежат в `hop-auth.recheck` (`enabled`, `max_age`, `cooldown`, `retry_after`, `probe`, `probe_path`, `probe_timeout`, `probe_ttl`). `HOP_RECHECK=false` отключает всю проверку.
+
 ## Цепочка выхода и доверенные хосты
 
 `/auth/sso/logout` выполняет выход пользователя здесь, аннулирует сессию и пересоздаёт CSRF-токен. Если `?next=` содержит доверенный URL, затем выполняется перенаправление туда. Так хаб выполняет выход пользователя из всех приложений. Всё остальное ведёт на `/`.
@@ -139,7 +151,7 @@ URL в `next` считается доверенным, если выполнен
 
 Доверенные хосты — это `hop-auth.trusted_hosts`, а также хаб (`HOP_HUB_URL`), это приложение (`APP_URL`) и URL из общего `config/hop.php` (`hop.public_url`, `hop.hub_url` и `url` каждого приложения).
 
-Список по умолчанию — семейство в продакшене: `hel.ink`, `www.hel.ink`, `hub.hel.ink`, `link.hel.ink`, `bio.hel.ink`, `note.hel.ink`, `pixel.hel.ink` и `file.hel.ink`. `HOP_TRUSTED_HOSTS` заменяет этот список. Если вы запускаете семейство на своём домене, укажите хосты своих приложений:
+Список по умолчанию — семейство в продакшене: `hel.ink`, `www.hel.ink`, `hub.hel.ink`, `link.hel.ink`, `bio.hel.ink`, `note.hel.ink`, `pixel.hel.ink`, `file.hel.ink` и `pay.hel.ink`. `HOP_TRUSTED_HOSTS` заменяет этот список. Если вы запускаете семейство на своём домене, укажите хосты своих приложений:
 
 ```ini
 HOP_TRUSTED_HOSTS=example.org,hub.example.org,link.example.org,bio.example.org
@@ -207,6 +219,7 @@ HopEvents::forget('session.revoked'); // drop the built-in handler
 | **PixelHop** | [pixel.hel.ink](https://pixel.hel.ink) · `p.hel.ink/…` | [navi-crwn/PixelHop](https://github.com/navi-crwn/PixelHop) | Image hosting with albums and direct links. |
 | **NoteHop** | [note.hel.ink](https://note.hel.ink) · `n.hel.ink/…` | [navi-crwn/NoteHop](https://github.com/navi-crwn/NoteHop) | Encrypted notes you share with a link. |
 | **FileHop** | [file.hel.ink](https://file.hel.ink) | [navi-crwn/FileHop](https://github.com/navi-crwn/FileHop) | Convert files in your browser; nothing is uploaded. |
+| **PayHop** | [pay.hel.ink](https://pay.hel.ink) | [navi-crwn/PayHop](https://github.com/navi-crwn/PayHop) | Make a payment QR and split a bill; nothing leaves your browser. |
 | **Imperium** | not public-facing: optional, for admins | [navi-crwn/Imperium](https://github.com/navi-crwn/Imperium) | The HOP control panel. |
 <!-- hop-family:end -->
 

@@ -34,7 +34,7 @@ Paket ini tidak ada di Packagist. Tambahkan repositori ke `composer.json` aplika
     }
 ],
 "require": {
-    "hop/auth": "^0.1.2"
+    "hop/auth": "^0.2.0"
 }
 ```
 
@@ -67,6 +67,8 @@ HOP_SSO_SECRET=at-least-32-characters-shared-with-the-hub
 | `HOP_SSO_SECRET_PREV` | tidak ada | Secret sebelumnya, hanya diterima selama Anda melakukan rotasi. |
 | `HOP_USER_MODEL` | `App\Models\User` | Model yang dimasukkan, sekaligus pemilik token API. |
 | `HOP_TRUSTED_HOSTS` | host keluarga produksi | Host yang boleh menjadi tujuan pengalihan logout berantai. Lihat di bawah. |
+| `HOP_RECHECK` | `true` | Pengecekan ulang akun secara senyap saat halaman dimuat (`false` mematikannya). Lihat di bawah. |
+| `HOP_RECHECK_MAX_AGE` | `300` | Detik sebuah sesi dianggap segar sejak hub terakhir mengesahkannya. `0` mematikan pengecekan ulang. |
 
 Opsi lainnya tidak punya variabel lingkungan. Terbitkan file konfigurasi untuk mengubahnya:
 
@@ -127,6 +129,16 @@ Setiap token boleh membuat `rate_limit` permintaan per jam. Token yang `rate_lim
 
 Permintaan yang ditolak mendapat `429` dengan `retry_after` di body dan header `Retry-After` yang sesuai, keduanya dalam detik sampai jendela berakhir.
 
+## Cek ulang akun senyap
+
+Sesi di aplikasi Anda bisa bertahan lebih lama daripada akun yang dipakai orang itu di hub: ia masuk sebagai akun lain, atau keluar, di hub, dan aplikasi Anda tetap memakai akun lama. `hop.auth` menutup celah itu tanpa migrasi:
+
+- Sesi dianggap **segar** selama `recheck.max_age` detik (bawaan 300) sejak hub terakhir mengesahkannya, lewat proses masuk atau jawaban senyap. Waktunya disimpan di sesi.
+- Bila tidak segar, pemuatan halaman (sebuah `GET` yang bukan XHR, bukan JSON, dan bukan prefetch) melakukan satu perjalanan `prompt=none` ke hub ([SSO senyap](https://github.com/navi-crwn/HEL.ink/blob/main/docs/silent-sso.md)). Akun sama: halaman dimuat seolah tidak terjadi apa-apa. Akun lain: sesi berganti ke akun itu. `login_required`: orang itu dikeluarkan dari sini dan melihat halaman sebagai tamu. Halaman terlindung lalu memulai proses masuk biasa; halaman publik tidak menampilkan proses masuk sama sekali.
+- Pengaman: permintaan POST atau XHR tidak pernah dialihkan. Selama hub tidak menjawab URL kesehatannya (`/up`) dengan 2xx, misalnya 502 atau waktu habis, tidak ada pengalihan dan tidak ada yang dikeluarkan: sesi tetap dipercaya, dan pemuatan halaman berikutnya setelah hasil cache kedaluwarsa (60 detik) mencoba lagi. Paling banyak satu percobaan per `recheck.cooldown` detik (30), jadi tidak ada loop. Galat hub lain, misalnya `temporarily_unavailable`, mempertahankan sesi dan menunggu `recheck.retry_after` detik (300). `state` harus sama dengan yang dimulai sesi.
+- Halaman yang tidak memerlukan login tetapi menampilkan akun (halaman depan dengan tombol "Dasbor") diberi `hop.recheck` di middleware-nya agar ikut diperiksa.
+- Kuncinya ada di `hop-auth.recheck` (`enabled`, `max_age`, `cooldown`, `retry_after`, `probe`, `probe_path`, `probe_timeout`, `probe_ttl`). `HOP_RECHECK=false` mematikan seluruh pengecekan.
+
 ## Logout berantai dan host tepercaya
 
 `/auth/sso/logout` mengeluarkan pengguna di sini, membatalkan sesi, dan membuat ulang token CSRF. Jika `?next=` berisi URL tepercaya, pengguna lalu dialihkan ke sana. Dengan cara inilah hub mengeluarkan pengguna dari setiap aplikasi. Selain itu, pengguna diarahkan ke `/`.
@@ -139,7 +151,7 @@ URL `next` dianggap tepercaya jika semua syarat ini terpenuhi:
 
 Host tepercaya adalah `hop-auth.trusted_hosts` ditambah hub (`HOP_HUB_URL`), aplikasi ini (`APP_URL`), dan URL di `config/hop.php` bersama (`hop.public_url`, `hop.hub_url`, dan `url` setiap aplikasi).
 
-Daftar bawaan adalah keluarga produksi: `hel.ink`, `www.hel.ink`, `hub.hel.ink`, `link.hel.ink`, `bio.hel.ink`, `note.hel.ink`, `pixel.hel.ink`, dan `file.hel.ink`. `HOP_TRUSTED_HOSTS` menggantikan daftar itu. Jika Anda menjalankan keluarga ini di domain sendiri, atur host aplikasi Anda:
+Daftar bawaan adalah keluarga produksi: `hel.ink`, `www.hel.ink`, `hub.hel.ink`, `link.hel.ink`, `bio.hel.ink`, `note.hel.ink`, `pixel.hel.ink`, `file.hel.ink`, dan `pay.hel.ink`. `HOP_TRUSTED_HOSTS` menggantikan daftar itu. Jika Anda menjalankan keluarga ini di domain sendiri, atur host aplikasi Anda:
 
 ```ini
 HOP_TRUSTED_HOSTS=example.org,hub.example.org,link.example.org,bio.example.org
@@ -207,6 +219,7 @@ Anda tidak perlu memasang paket ini secara manual untuk menjalankan HOP. LinkHop
 | **PixelHop** | [pixel.hel.ink](https://pixel.hel.ink) · `p.hel.ink/…` | [navi-crwn/PixelHop](https://github.com/navi-crwn/PixelHop) | Image hosting with albums and direct links. |
 | **NoteHop** | [note.hel.ink](https://note.hel.ink) · `n.hel.ink/…` | [navi-crwn/NoteHop](https://github.com/navi-crwn/NoteHop) | Encrypted notes you share with a link. |
 | **FileHop** | [file.hel.ink](https://file.hel.ink) | [navi-crwn/FileHop](https://github.com/navi-crwn/FileHop) | Convert files in your browser; nothing is uploaded. |
+| **PayHop** | [pay.hel.ink](https://pay.hel.ink) | [navi-crwn/PayHop](https://github.com/navi-crwn/PayHop) | Make a payment QR and split a bill; nothing leaves your browser. |
 | **Imperium** | not public-facing: optional, for admins | [navi-crwn/Imperium](https://github.com/navi-crwn/Imperium) | The HOP control panel. |
 <!-- hop-family:end -->
 

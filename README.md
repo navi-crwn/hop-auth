@@ -34,7 +34,7 @@ The package is not on Packagist. Add the repository to the app's `composer.json`
     }
 ],
 "require": {
-    "hop/auth": "^0.1.2"
+    "hop/auth": "^0.2.0"
 }
 ```
 
@@ -67,6 +67,8 @@ HOP_SSO_SECRET=at-least-32-characters-shared-with-the-hub
 | `HOP_SSO_SECRET_PREV` | none | The previous secret, accepted only while you rotate. |
 | `HOP_USER_MODEL` | `App\Models\User` | The model signed in, and the owner of an API token. |
 | `HOP_TRUSTED_HOSTS` | the production family hosts | Hosts the chained logout may redirect to. See below. |
+| `HOP_RECHECK` | `true` | Silent account re-check on page loads (`false` turns it off). See below. |
+| `HOP_RECHECK_MAX_AGE` | `300` | Seconds a session counts as fresh after the hub last vouched for it. `0` turns the re-check off. |
 
 The remaining options have no environment variable. Publish the config file to change them:
 
@@ -127,6 +129,16 @@ Each token may make `rate_limit` requests per hour. A token whose `rate_limit` i
 
 A refused request gets a `429` with `retry_after` in the body and a matching `Retry-After` header, both in seconds until the window ends.
 
+## Silent account re-check
+
+A session in your app can outlive the account the person has at the hub: they sign in as someone else, or out, at the hub, and your app keeps the old account. `hop.auth` closes that gap with no migration:
+
+- The session is **fresh** for `recheck.max_age` seconds (default 300) after the hub last vouched for it, by a sign-in or by a silent answer. The time is kept in the session.
+- When it is not fresh, a page load (a `GET` that is not XHR or JSON and not a prefetch) makes one `prompt=none` round trip to the hub ([silent SSO](https://github.com/navi-crwn/HEL.ink/blob/main/docs/silent-sso.md)). Same account: the page loads as if nothing happened. Another account: the session switches to it. `login_required`: the person is signed out here and lands on the page as a guest. A protected page then starts the normal sign-in; a public page shows no sign-in at all.
+- Safeguards: a POST or an XHR request is never redirected. While the hub does not answer its health URL (`/up`) with a 2xx, such as a 502 or a timeout, nothing is redirected and nobody is signed out: the session stays trusted and the next page load after the cached verdict expires (60 seconds) tries again. At most one attempt per `recheck.cooldown` seconds (30), so there is no loop. Any other hub error, such as `temporarily_unavailable`, keeps the session and waits `recheck.retry_after` seconds (300). The `state` must be the one the session started.
+- Pages that need no sign-in but show the account (a landing page with a "Dashboard" button) get `hop.recheck` in their middleware, so they are checked too.
+- The keys are in `hop-auth.recheck` (`enabled`, `max_age`, `cooldown`, `retry_after`, `probe`, `probe_path`, `probe_timeout`, `probe_ttl`). `HOP_RECHECK=false` turns the whole check off.
+
 ## Chained logout and trusted hosts
 
 `/auth/sso/logout` signs the person out here, invalidates the session and regenerates the CSRF token. If `?next=` holds a trusted URL it then redirects there, which is how the hub signs a person out of every app. Anything else goes to `/`.
@@ -139,7 +151,7 @@ A `next` URL is trusted when all of this holds:
 
 The trusted hosts are `hop-auth.trusted_hosts` plus the hub (`HOP_HUB_URL`), this app (`APP_URL`), and the URLs in the shared `config/hop.php` (`hop.public_url`, `hop.hub_url` and each app's `url`).
 
-The default list is the production family: `hel.ink`, `www.hel.ink`, `hub.hel.ink`, `link.hel.ink`, `bio.hel.ink`, `note.hel.ink`, `pixel.hel.ink` and `file.hel.ink`. `HOP_TRUSTED_HOSTS` replaces that list. If you run the family on your own domain, set the hosts of your apps:
+The default list is the production family: `hel.ink`, `www.hel.ink`, `hub.hel.ink`, `link.hel.ink`, `bio.hel.ink`, `note.hel.ink`, `pixel.hel.ink`, `file.hel.ink` and `pay.hel.ink`. `HOP_TRUSTED_HOSTS` replaces that list. If you run the family on your own domain, set the hosts of your apps:
 
 ```ini
 HOP_TRUSTED_HOSTS=example.org,hub.example.org,link.example.org,bio.example.org
@@ -207,6 +219,7 @@ You do not install this package by hand to run HOP. LinkHop and BioHop list this
 | **PixelHop** | [pixel.hel.ink](https://pixel.hel.ink) · `p.hel.ink/…` | [navi-crwn/PixelHop](https://github.com/navi-crwn/PixelHop) | Image hosting with albums and direct links. |
 | **NoteHop** | [note.hel.ink](https://note.hel.ink) · `n.hel.ink/…` | [navi-crwn/NoteHop](https://github.com/navi-crwn/NoteHop) | Encrypted notes you share with a link. |
 | **FileHop** | [file.hel.ink](https://file.hel.ink) | [navi-crwn/FileHop](https://github.com/navi-crwn/FileHop) | Convert files in your browser; nothing is uploaded. |
+| **PayHop** | [pay.hel.ink](https://pay.hel.ink) | [navi-crwn/PayHop](https://github.com/navi-crwn/PayHop) | Make a payment QR and split a bill; nothing leaves your browser. |
 | **Imperium** | not public-facing: optional, for admins | [navi-crwn/Imperium](https://github.com/navi-crwn/Imperium) | The HOP control panel. |
 <!-- hop-family:end -->
 

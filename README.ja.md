@@ -34,7 +34,7 @@ HOP ID 用の Laravel クライアントです。HOP ID は HOP ファミリー�
     }
 ],
 "require": {
-    "hop/auth": "^0.1.2"
+    "hop/auth": "^0.2.0"
 }
 ```
 
@@ -67,6 +67,8 @@ HOP_SSO_SECRET=at-least-32-characters-shared-with-the-hub
 | `HOP_SSO_SECRET_PREV` | なし | 以前のシークレット。ローテーション中だけ受け付けます。 |
 | `HOP_USER_MODEL` | `App\Models\User` | サインインさせるモデル。API トークンの所有者でもあります。 |
 | `HOP_TRUSTED_HOSTS` | 本番環境のファミリーのホスト | 連鎖ログアウトがリダイレクトしてよいホスト。下記を参照してください。 |
+| `HOP_RECHECK` | `true` | ページ読み込み時のサイレントなアカウント再確認(`false` で無効)。下記を参照してください。 |
+| `HOP_RECHECK_MAX_AGE` | `300` | ハブが最後に保証してから、セッションを新しいとみなす秒数。`0` で再確認を無効にします。 |
 
 残りのオプションには環境変数がありません。変更するには設定ファイルを公開します。
 
@@ -127,6 +129,16 @@ Route::middleware('hop.token:link:create')->post('/api/links', StoreLinkControll
 
 拒否されたリクエストには `429` が返り、本文に `retry_after`、対応する `Retry-After` ヘッダーが付きます。どちらもウィンドウが終わるまでの秒数です。
 
+## サイレントなアカウント再確認
+
+アプリのセッションは、ハブでその人が使っているアカウントより長く残ることがあります。ハブで別のアカウントとしてサインインしたりサインアウトしたりしても、アプリは古いアカウントのままです。`hop.auth` はマイグレーションなしでこの穴を塞ぎます。
+
+- セッションは、ハブが最後に保証してから `recheck.max_age` 秒(既定 300)のあいだ**新しい**とみなされます。保証はサインインまたはサイレントな応答で行われ、時刻はセッションに保存されます。
+- 新しくない場合、ページの読み込み(XHR でも JSON でもプリフェッチでもない `GET`)で、ハブへ `prompt=none` の往復を 1 回だけ行います([サイレント SSO](https://github.com/navi-crwn/HEL.ink/blob/main/docs/silent-sso.md))。同じアカウント: 何事もなかったようにページが読み込まれます。別のアカウント: セッションがそのアカウントに切り替わります。`login_required`: ここでサインアウトされ、ゲストとしてそのページが表示されます。保護されたページは通常のサインインを始め、公開ページにはサインイン画面は一切表示されません。
+- 安全策: POST や XHR リクエストはリダイレクトされません。ハブがヘルス URL(`/up`)に 2xx で応答しない間(502 やタイムアウトなど)は、リダイレクトもサインアウトもしません。セッションは信頼されたままで、キャッシュした判定の期限(60 秒)が切れたあとの次のページ読み込みで再試行します。試行は `recheck.cooldown` 秒(30)に最大 1 回なので、ループしません。`temporarily_unavailable` など他のハブのエラーは、セッションを保ったまま `recheck.retry_after` 秒(300)待ちます。`state` はセッションが開始したものと一致する必要があります。
+- サインイン不要でもアカウントを表示するページ(「ダッシュボード」ボタンのあるトップページなど)は、ミドルウェアに `hop.recheck` を付けると同様に確認されます。
+- キーは `hop-auth.recheck`(`enabled`、`max_age`、`cooldown`、`retry_after`、`probe`、`probe_path`、`probe_timeout`、`probe_ttl`)にあります。`HOP_RECHECK=false` で確認全体を無効にできます。
+
 ## 連鎖ログアウトと信頼できるホスト
 
 `/auth/sso/logout` はこのアプリでユーザーをサインアウトさせ、セッションを無効にし、CSRF トークンを再生成します。`?next=` に信頼できる URL があれば、続けてそこへリダイレクトします。ハブはこの仕組みでユーザーをすべてのアプリからサインアウトさせます。それ以外の場合は `/` へ移動します。
@@ -139,7 +151,7 @@ Route::middleware('hop.token:link:create')->post('/api/links', StoreLinkControll
 
 信頼できるホストは、`hop-auth.trusted_hosts` に加えて、ハブ（`HOP_HUB_URL`）、このアプリ（`APP_URL`）、共有の `config/hop.php` にある URL（`hop.public_url`、`hop.hub_url`、各アプリの `url`）です。
 
-デフォルトのリストは本番環境のファミリーです: `hel.ink`、`www.hel.ink`、`hub.hel.ink`、`link.hel.ink`、`bio.hel.ink`、`note.hel.ink`、`pixel.hel.ink`、`file.hel.ink`。`HOP_TRUSTED_HOSTS` はこのリストを置き換えます。自分のドメインでファミリーを運用する場合は、自分のアプリのホストを設定してください。
+デフォルトのリストは本番環境のファミリーです: `hel.ink`、`www.hel.ink`、`hub.hel.ink`、`link.hel.ink`、`bio.hel.ink`、`note.hel.ink`、`pixel.hel.ink`、`file.hel.ink`、`pay.hel.ink`。`HOP_TRUSTED_HOSTS` はこのリストを置き換えます。自分のドメインでファミリーを運用する場合は、自分のアプリのホストを設定してください。
 
 ```ini
 HOP_TRUSTED_HOSTS=example.org,hub.example.org,link.example.org,bio.example.org
@@ -207,6 +219,7 @@ HOP を動かすために、このパッケージを手動でインストール�
 | **PixelHop** | [pixel.hel.ink](https://pixel.hel.ink) · `p.hel.ink/…` | [navi-crwn/PixelHop](https://github.com/navi-crwn/PixelHop) | Image hosting with albums and direct links. |
 | **NoteHop** | [note.hel.ink](https://note.hel.ink) · `n.hel.ink/…` | [navi-crwn/NoteHop](https://github.com/navi-crwn/NoteHop) | Encrypted notes you share with a link. |
 | **FileHop** | [file.hel.ink](https://file.hel.ink) | [navi-crwn/FileHop](https://github.com/navi-crwn/FileHop) | Convert files in your browser; nothing is uploaded. |
+| **PayHop** | [pay.hel.ink](https://pay.hel.ink) | [navi-crwn/PayHop](https://github.com/navi-crwn/PayHop) | Make a payment QR and split a bill; nothing leaves your browser. |
 | **Imperium** | not public-facing: optional, for admins | [navi-crwn/Imperium](https://github.com/navi-crwn/Imperium) | The HOP control panel. |
 <!-- hop-family:end -->
 
