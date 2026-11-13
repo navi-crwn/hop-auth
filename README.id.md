@@ -121,7 +121,7 @@ Klien mengirim `Authorization: Bearer hlk_…`. Paket ini hanya menyimpan hash S
 
 Jika berhasil, permintaan membawa atribut `api_user` dan `api_token`, dan `$request->user()` mengembalikan pemilik token.
 
-`hop.token` tanpa scope hanya memeriksa bahwa token valid. `hop.token:link:create` juga membutuhkan scope `link:create`. Token tanpa scope (null atau daftar kosong) boleh melakukan apa saja. Selain itu, `can()` menerima kecocokan persis, wildcard awalan seperti `link:*`, atau `*`. Scope yang ditetapkan keluarga ada di `ApiToken::SCOPES`: `link:read`, `link:create`, `link:write`, `bio:read`, `bio:write`, `pixel:read`, dan `pixel:write`.
+`hop.token` tanpa scope hanya memeriksa bahwa token valid. `hop.token:link:create` juga membutuhkan scope `link:create`. Token tanpa scope (null atau daftar kosong) boleh melakukan apa saja. Selain itu, `can()` menerima kecocokan persis, wildcard awalan seperti `link:*`, atau `*`. Scope yang ditetapkan keluarga ada di `ApiToken::SCOPES`: `link:read`, `link:create`, `link:write`, `bio:read`, `bio:write`, `pixel:read`, dan `pixel:write`. Hub HOP hanya menawarkan scope `link:*` saat membuat token baru (token hub untuk LinkHop) dan menolak token baru yang membawa scope `pixel:*`, karena PixelHop menerbitkan kuncinya sendiri. Scope `bio:*` ada di daftar, tetapi tidak ditawarkan di formulir. Token yang dibuat sebelumnya dengan scope `pixel:*` tetap berfungsi.
 
 ### Batas laju token API
 
