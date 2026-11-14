@@ -1,0 +1,64 @@
+name: package tests
+
+# The package tests need the hub's User model, factories, migrations and TestCase,
+# so they run inside a checkout of the hub with this package swapped in.
+# The hub ref can be set per run (workflow_dispatch input) or per repository
+# (variable HUB_REF); it defaults to main.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      hub_ref:
+        description: Branch, tag or commit of navi-crwn/HEL.ink to test against
+        required: false
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  package-tests:
+    name: package tests against the hub (php 8.3)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout this package
+        uses: actions/checkout@v4
+        with:
+          path: pkg
+          persist-credentials: false
+
+      - name: checkout the hub
+        uses: actions/checkout@v4
+        with:
+          repository: navi-crwn/HEL.ink
+          ref: ${{ inputs.hub_ref || vars.HUB_REF || 'main' }}
+          path: hub
+          persist-credentials: false
+
+      - name: swap this package into the hub
+        run: |
+          set -euo pipefail
+          rm -rf hub/packages/auth
+          mkdir hub/packages/auth
+          git -C pkg archive HEAD | tar -x -C hub/packages/auth
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: gd, sqlite3, pdo_sqlite
+          coverage: none
+
+      - name: install the hub
+        working-directory: hub
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: run the package tests
+        working-directory: hub
+        run: php -d memory_limit=-1 vendor/bin/pest packages/auth/tests
