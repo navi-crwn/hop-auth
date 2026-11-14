@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - main
+      - ci/run-tests
   workflow_dispatch:
     inputs:
       hub_ref:
