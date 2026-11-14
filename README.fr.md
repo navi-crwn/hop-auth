@@ -121,7 +121,7 @@ Un client envoie `Authorization: Bearer hlk_…`. Le paquet ne stocke que le has
 
 En cas de succès, la requête porte les attributs `api_user` et `api_token`, et `$request->user()` renvoie le propriétaire du jeton.
 
-`hop.token` sans scope vérifie seulement que le jeton est valide. `hop.token:link:create` exige en plus le scope `link:create`. Un jeton sans scopes (null ou liste vide) peut tout faire. Sinon, `can()` accepte une correspondance exacte, un joker de préfixe comme `link:*`, ou `*`. Les scopes définis par la famille sont dans `ApiToken::SCOPES` : `link:read`, `link:create`, `link:write`, `bio:read`, `bio:write`, `pixel:read` et `pixel:write`.
+`hop.token` sans scope vérifie seulement que le jeton est valide. `hop.token:link:create` exige en plus le scope `link:create`. Un jeton sans scopes (null ou liste vide) peut tout faire. Sinon, `can()` accepte une correspondance exacte, un joker de préfixe comme `link:*`, ou `*`. Les scopes définis par la famille sont dans `ApiToken::SCOPES` : `link:read`, `link:create`, `link:write`, `bio:read`, `bio:write`, `pixel:read` et `pixel:write`. Le hub HOP ne propose que les scopes `link:*` quand on crée un nouveau jeton (les jetons du hub sont destinés à LinkHop) et refuse un nouveau jeton portant un scope `pixel:*`, car PixelHop émet ses propres clés. Les scopes `bio:*` figurent dans la liste, mais le formulaire ne les propose pas. Un jeton créé auparavant avec un scope `pixel:*` reste valide, mais ce scope ne sert plus à rien : PixelHop n'accepte que ses propres clés `ph_`, jamais un jeton du hub.
 
 ### Limite de requêtes des jetons d'API
 

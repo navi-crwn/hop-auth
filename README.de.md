@@ -121,7 +121,7 @@ Ein Client sendet `Authorization: Bearer hlk_…`. Das Paket speichert nur den S
 
 Bei Erfolg trägt die Anfrage die Attribute `api_user` und `api_token`, und `$request->user()` gibt den Besitzer des Tokens zurück.
 
-`hop.token` ohne Scope prüft nur, ob das Token gültig ist. `hop.token:link:create` braucht zusätzlich den Scope `link:create`. Ein Token ohne Scopes (null oder eine leere Liste) darf alles. Sonst akzeptiert `can()` eine exakte Übereinstimmung, ein Präfix-Wildcard wie `link:*` oder `*`. Die Scopes, die die Familie definiert, stehen in `ApiToken::SCOPES`: `link:read`, `link:create`, `link:write`, `bio:read`, `bio:write`, `pixel:read` und `pixel:write`.
+`hop.token` ohne Scope prüft nur, ob das Token gültig ist. `hop.token:link:create` braucht zusätzlich den Scope `link:create`. Ein Token ohne Scopes (null oder eine leere Liste) darf alles. Sonst akzeptiert `can()` eine exakte Übereinstimmung, ein Präfix-Wildcard wie `link:*` oder `*`. Die Scopes, die die Familie definiert, stehen in `ApiToken::SCOPES`: `link:read`, `link:create`, `link:write`, `bio:read`, `bio:write`, `pixel:read` und `pixel:write`. Der HOP-Hub bietet beim Anlegen eines neuen Tokens nur die `link:*`-Scopes an (Hub-Tokens sind für LinkHop) und lehnt ein neues Token mit einem `pixel:*`-Scope ab, weil PixelHop eigene Schlüssel ausgibt. Die `bio:*`-Scopes stehen in der Liste, das Formular bietet sie aber nicht an. Ein früher mit einem `pixel:*`-Scope erstelltes Token bleibt gültig, der Scope bewirkt aber nichts mehr: PixelHop akzeptiert nur seine eigenen `ph_`-Schlüssel, nie ein Hub-Token.
 
 ### Rate Limit für API-Tokens
 

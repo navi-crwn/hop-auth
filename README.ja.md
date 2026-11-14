@@ -121,7 +121,7 @@ Route::middleware('hop.token:link:create')->post('/api/links', StoreLinkControll
 
 成功すると、リクエストには `api_user` と `api_token` の属性が付き、`$request->user()` はトークンの所有者を返します。
 
-スコープなしの `hop.token` は、トークンが有効かどうかだけを確認します。`hop.token:link:create` はさらに `link:create` スコープを必要とします。スコープのないトークン（null または空のリスト）は何でもできます。それ以外の場合、`can()` は完全一致、`link:*` のような前方一致のワイルドカード、または `*` を受け付けます。ファミリーが定義するスコープは `ApiToken::SCOPES` にあります: `link:read`、`link:create`、`link:write`、`bio:read`、`bio:write`、`pixel:read`、`pixel:write`。
+スコープなしの `hop.token` は、トークンが有効かどうかだけを確認します。`hop.token:link:create` はさらに `link:create` スコープを必要とします。スコープのないトークン（null または空のリスト）は何でもできます。それ以外の場合、`can()` は完全一致、`link:*` のような前方一致のワイルドカード、または `*` を受け付けます。ファミリーが定義するスコープは `ApiToken::SCOPES` にあります: `link:read`、`link:create`、`link:write`、`bio:read`、`bio:write`、`pixel:read`、`pixel:write`。HOP ハブは、新しいトークンを作るときに `link:*` スコープだけを提示し（ハブのトークンは LinkHop 用です）、`pixel:*` スコープを持つ新しいトークンは拒否します。PixelHop は独自のキーを発行するためです。`bio:*` スコープは一覧にありますが、フォームでは提示されません。以前に `pixel:*` スコープ付きで作られたトークンは有効なままですが、そのスコープはもう何の効力もありません。PixelHop は独自の `ph_` キーだけを受け付け、ハブのトークンは受け付けません。
 
 ### API トークンのレート制限
 

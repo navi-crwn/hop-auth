@@ -121,7 +121,7 @@ Route::middleware('hop.token:link:create')->post('/api/links', StoreLinkControll
 
 成功时，请求带有 `api_user` 和 `api_token` 属性，`$request->user()` 返回令牌的所有者。
 
-不带作用域的 `hop.token` 只检查令牌是否有效。`hop.token:link:create` 还要求 `link:create` 作用域。没有作用域的令牌（null 或空列表）可以做任何事。否则，`can()` 接受精确匹配、`link:*` 这样的前缀通配符，或 `*`。家族定义的作用域在 `ApiToken::SCOPES` 中：`link:read`、`link:create`、`link:write`、`bio:read`、`bio:write`、`pixel:read` 和 `pixel:write`。
+不带作用域的 `hop.token` 只检查令牌是否有效。`hop.token:link:create` 还要求 `link:create` 作用域。没有作用域的令牌（null 或空列表）可以做任何事。否则，`can()` 接受精确匹配、`link:*` 这样的前缀通配符，或 `*`。家族定义的作用域在 `ApiToken::SCOPES` 中：`link:read`、`link:create`、`link:write`、`bio:read`、`bio:write`、`pixel:read` 和 `pixel:write`。HOP 中枢在创建新令牌时只提供 `link:*` 作用域（中枢令牌用于 LinkHop），并拒绝带有 `pixel:*` 作用域的新令牌，因为 PixelHop 自己签发密钥。`bio:*` 作用域在列表中，但表单不提供。以前带 `pixel:*` 作用域创建的令牌仍然有效，但该作用域已不起任何作用：PixelHop 只接受自己的 `ph_` 密钥，不接受中枢令牌。
 
 ### API 令牌速率限制
 
